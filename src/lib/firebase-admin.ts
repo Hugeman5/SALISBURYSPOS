@@ -2,7 +2,7 @@ import { getApps, initializeApp, applicationDefault, cert, App } from 'firebase-
 import { getAuth, Auth } from 'firebase-admin/auth';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 
-const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'salisburyspos';
+const PROJECT_ID = "salisburyspos";
 
 function initAdminApp(): App {
   const existing = getApps()[0];
