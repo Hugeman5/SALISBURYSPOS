@@ -15,6 +15,12 @@ function initAdminApp(): App {
   if (gac)    return initializeApp({ credential: applicationDefault(), projectId: PROJECT_ID });
   if (b64)    return initializeApp({ credential: cert(JSON.parse(Buffer.from(b64, 'base64').toString('utf8'))), projectId: PROJECT_ID });
   if (inline) return initializeApp({ credential: cert(JSON.parse(inline)), projectId: PROJECT_ID });
+  
+  // For local development when no credentials are provided
+  if (process.env.NODE_ENV === 'development') {
+    console.warn('Firebase Admin credentials not found, initializing with project ID only. This is for local development and will have limited functionality.');
+    return initializeApp({ projectId: PROJECT_ID });
+  }
 
   throw new Error('ADMIN_CREDENTIALS_MISSING');
 }
