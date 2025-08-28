@@ -1,9 +1,11 @@
+
 'use client';
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { signInWithCustomToken, signOut, onAuthStateChanged, type User as FbUser } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 type Role = 'admin'|'manager'|'cashier'|'waiter'|'kitchen';
 
@@ -31,6 +33,7 @@ export const useAuth = create<AuthState>()(
       loading: false,
 
       async loginWithPin(id: string, pin: string) {
+        if (get().loading) return false; // Prevent concurrent attempts
         set({ loading: true });
         try {
           const res = await fetch('/api/auth/pin-login', {
@@ -46,14 +49,12 @@ export const useAuth = create<AuthState>()(
             return false;
           }
       
-          const { token } = await res.json(); // <-- only token is guaranteed
+          const { token } = await res.json(); 
           const cred = await signInWithCustomToken(auth, token);
       
-          // Pull role from custom claims (set on server)
-          const idTokenResult = await cred.user.getIdTokenResult(true);
-          const roleClaim = (idTokenResult.claims.role as Role) || 'cashier';
-          set({ role: roleClaim });
-      
+          // This will trigger onAuthStateChanged, which handles setting profile and role
+          await cred.user.getIdTokenResult(true);
+
           return true;
         } catch (e) {
           console.error('loginWithPin error:', e);
@@ -68,10 +69,33 @@ export const useAuth = create<AuthState>()(
         set({ profile: null, role: null });
       },
 
-      setFromFirebase(fb) {
-        if (!fb) { set({ profile: null }); return; }
-        // You can fetch Firestore user doc later and set a richer profile.
-        set({ profile: { id: fb.uid, name: fb.displayName || 'User', role: (get().role || 'cashier') as Role, active: true } });
+      async setFromFirebase(fb) {
+        if (!fb) { 
+            set({ profile: null, role: null }); 
+            return; 
+        }
+
+        const idTokenResult = await fb.getIdTokenResult(true);
+        const roleClaim = (idTokenResult.claims.role as Role) || null;
+        set({ role: roleClaim });
+        
+        // Fetch user profile from Firestore for rich details
+        const userRef = doc(db, 'users', fb.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+            const userData = userSnap.data();
+            set({
+                profile: {
+                    id: fb.uid,
+                    name: userData.name || fb.displayName || 'User',
+                    role: (roleClaim || userData.role || 'cashier') as Role,
+                    active: userData.active ?? false,
+                }
+            })
+        } else {
+            // Fallback profile if Firestore doc is not found
+            set({ profile: { id: fb.uid, name: fb.displayName || 'User', role: (roleClaim || 'cashier') as Role, active: true } });
+        }
       }
     }),
     {
@@ -83,11 +107,13 @@ export const useAuth = create<AuthState>()(
 );
 
 // Bootstraps listener (call once on a client root)
+let authListenerAttached = false;
 export function attachAuthListenerOnce() {
-  if (typeof window === 'undefined') return;
-  let attached = (window as any).__salisburysposAuthAttached;
-  if (attached) return;
-  (window as any).__salisburysposAuthAttached = true;
+  if (typeof window === 'undefined' || authListenerAttached) return;
+  authListenerAttached = true;
+  
   const { setFromFirebase } = useAuth.getState();
-  onAuthStateChanged(auth, (u) => setFromFirebase(u));
+  onAuthStateChanged(auth, (user) => {
+    setFromFirebase(user);
+  });
 }
