@@ -33,7 +33,7 @@ export default function ReportsPage() {
       const ts = o.createdAt.toDate();
       const key = ts.toISOString().slice(0,10); // YYYY-MM-DD
       const cur = byDate.get(key) ?? { total: 0, count: 0 };
-      byDate.set(key, { total: cur.total + Number(o.total||0), count: cur.count + 1 });
+      byDate.set(key, { total: cur.total + Number(o.totals.totalInc || 0), count: cur.count + 1 });
     });
     
     const list = Array.from(byDate.entries())

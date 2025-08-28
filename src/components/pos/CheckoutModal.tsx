@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import {
@@ -17,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import Link from 'next/link';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -31,12 +33,19 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, onSucc
   const { toast } = useToast();
   const [amountTenderedStr, setAmountTenderedStr] = useState('');
   const [isProcessing, setProcessing] = useState(false);
-  const [orderId, setOrderId] = useState<string | null>(null);
+  const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
 
   const amountTendered = useMemo(() => parseToCents(amountTenderedStr), [amountTenderedStr]);
   const changeDue = useMemo(() => Math.max(0, amountTendered - totals.totalInc), [amountTendered, totals.totalInc]);
   
   const functions = getFunctions();
+
+  // Reset state when modal closes
+  const handleClose = () => {
+      setAmountTenderedStr('');
+      setCompletedOrderId(null);
+      onClose();
+  }
 
   const handleFinalize = async () => {
     if (amountTendered < totals.totalInc) {
@@ -51,8 +60,9 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, onSucc
     setProcessing(true);
     
     try {
+      // These Cloud Function names are placeholders. You will need to implement them.
       const cashierCreateOrder = httpsCallable(functions, 'cashierCreateOrder');
-      const { data: createData } = await cashierCreateOrder({});
+      const { data: createData } = await cashierCreateOrder({ note: '' });
       const newOrderId = (createData as any).orderId;
       if (!newOrderId) throw new Error("Failed to create order.");
 
@@ -76,6 +86,7 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, onSucc
         title: "Sale Successful",
         description: `Change due: ${fmtZAR(changeDue)}`,
       });
+      setCompletedOrderId(newOrderId);
       onSuccess();
 
     } catch (error: any) {
@@ -91,40 +102,63 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, onSucc
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Checkout</DialogTitle>
-          <DialogDescription>
-            Total amount due: <span className="font-bold text-foreground">{fmtZAR(totals.totalInc)}</span>
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="amount-tendered" className="text-right">
-              Amount Tendered
-            </Label>
-            <Input
-              id="amount-tendered"
-              value={amountTenderedStr}
-              onChange={(e) => setAmountTenderedStr(e.target.value)}
-              className="col-span-3"
-              type="number"
-              placeholder="e.g., 500.00"
-              autoFocus
-            />
-          </div>
-           <div className="text-right text-lg">
-            Change Due: <span className="font-bold">{fmtZAR(changeDue)}</span>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isProcessing}>Cancel</Button>
-          <Button onClick={handleFinalize} disabled={isProcessing}>
-            {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Finalize Sale
-          </Button>
-        </DialogFooter>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose() }}>
+      <DialogContent onPointerDownOutside={(e) => { if (completedOrderId) e.preventDefault() }}>
+        {completedOrderId ? (
+            <>
+                 <DialogHeader>
+                    <DialogTitle>Sale Complete</DialogTitle>
+                    <DialogDescription>
+                        Change due: <span className="font-bold text-foreground">{fmtZAR(changeDue)}</span>
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4 flex justify-center">
+                    <Button asChild size="lg">
+                        <Link href={`/pos/orders/${completedOrderId}`} target="_blank">
+                            View Receipt
+                        </Link>
+                    </Button>
+                </div>
+                <DialogFooter>
+                    <Button onClick={handleClose}>Close</Button>
+                </DialogFooter>
+            </>
+        ) : (
+            <>
+                <DialogHeader>
+                <DialogTitle>Checkout</DialogTitle>
+                <DialogDescription>
+                    Total amount due: <span className="font-bold text-foreground">{fmtZAR(totals.totalInc)}</span>
+                </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="amount-tendered" className="text-right">
+                    Amount Tendered
+                    </Label>
+                    <Input
+                    id="amount-tendered"
+                    value={amountTenderedStr}
+                    onChange={(e) => setAmountTenderedStr(e.target.value)}
+                    className="col-span-3"
+                    type="number"
+                    placeholder="e.g., 500.00"
+                    autoFocus
+                    />
+                </div>
+                <div className="text-right text-lg">
+                    Change Due: <span className="font-bold">{fmtZAR(changeDue)}</span>
+                </div>
+                </div>
+                <DialogFooter>
+                <Button variant="outline" onClick={handleClose} disabled={isProcessing}>Cancel</Button>
+                <Button onClick={handleFinalize} disabled={isProcessing}>
+                    {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Finalize Sale
+                </Button>
+                </DialogFooter>
+            </>
+        )}
       </DialogContent>
     </Dialog>
   );
