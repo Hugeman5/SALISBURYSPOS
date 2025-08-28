@@ -38,18 +38,22 @@ export const useAuth = create<AuthState>()(
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ id, pin })
           });
-
-          // The API always answers JSON; if not ok, bail
+      
           if (!res.ok) {
             let msg = `${res.status}`;
             try { const j = await res.json(); msg = j.error || msg; } catch {}
             console.error('PIN login failed:', msg);
             return false;
           }
-
-          const { token, role } = await res.json();
-          await signInWithCustomToken(auth, token);
-          set({ role: role as Role });
+      
+          const { token } = await res.json(); // <-- only token is guaranteed
+          const cred = await signInWithCustomToken(auth, token);
+      
+          // Pull role from custom claims (set on server)
+          const idTokenResult = await cred.user.getIdTokenResult(true);
+          const roleClaim = (idTokenResult.claims.role as Role) || 'cashier';
+          set({ role: roleClaim });
+      
           return true;
         } catch (e) {
           console.error('loginWithPin error:', e);
