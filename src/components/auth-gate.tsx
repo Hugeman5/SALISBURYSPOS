@@ -1,10 +1,9 @@
 'use client';
 import { ReactNode, useEffect } from 'react';
-import { useAuth, attachAuthListenerOnce } from '@/stores/auth-store';
+import { useAuth } from '@/stores/auth-store';
 import { useRouter } from 'next/navigation';
 
 export function AuthGate({ children }: { children: ReactNode }) {
-  attachAuthListenerOnce();
   const router = useRouter();
   const profile = useAuth(s => s.profile);
 

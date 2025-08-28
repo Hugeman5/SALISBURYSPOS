@@ -3,14 +3,13 @@
 import { useEffect, useState } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { useAuth, attachAuthListenerOnce } from '@/stores/auth-store';
+import { useAuth } from '@/stores/auth-store';
 import { useRouter } from 'next/navigation';
 import { PinKeypad } from '@/components/pin-keypad';
 
 type User = { id: string; name: string; role: string; active: boolean };
 
 export default function LoginPage() {
-  attachAuthListenerOnce();
   const router = useRouter();
   const loginWithPin = useAuth(s => s.loginWithPin);
   const role = useAuth(s => s.role);
