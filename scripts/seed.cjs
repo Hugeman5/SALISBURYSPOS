@@ -1,21 +1,9 @@
 'use strict';
-const fs = require('fs');
-const { initializeApp, cert } = require('firebase-admin/app');
+const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 
-const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || '/home/user/serviceAccount.json';
-if (!fs.existsSync(keyPath)) {
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-    console.error('Missing GOOGLE_APPLICATION_CREDENTIALS or FIREBASE_SERVICE_ACCOUNT');
-    process.exit(1);
-  }
-  const key = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  initializeApp({ credential: cert(key) });
-} else {
-  const key = JSON.parse(fs.readFileSync(keyPath, 'utf8'));
-  initializeApp({ credential: cert(key) });
-}
-
+// Initialize without params - will use GOOGLE_APPLICATION_CREDENTIALS env var
+initializeApp();
 const db = getFirestore();
 
 (async () => {
