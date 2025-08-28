@@ -15,10 +15,10 @@ service cloud.firestore {
     function isManager() { return isSignedIn() && request.auth.token.role == 'manager'; }
 
     // ---- USERS ----
-    // Allow public read for login screen
     match /users/{userId} {
-      allow get: if true;
-      allow list: if true;
+      // Allow anyone to read the user list for the login screen.
+      // Writes are still restricted to admins.
+      allow read: if true;
       allow write: if isAdmin();
     }
 
@@ -38,13 +38,10 @@ service cloud.firestore {
     // ---- ORDERS (example) ----
     match /orders/{orderId} {
       allow read:  if hasAnyRole(['admin','manager']);
-      allow write: if hasAnySnyRole(['admin','manager']); // tighten later per workflow
+      allow write: if hasAnyRole(['admin','manager']); // tighten later per workflow
       match /items/{itemId} {
         allow read, write: if hasAnyRole(['admin','manager']);
       }
     }
-
-    // default deny
-    match /{document=**} { allow read, write: if false; }
   }
 }
