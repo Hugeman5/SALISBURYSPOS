@@ -1,12 +1,15 @@
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Minimal public read for login tiles
-    match /users/{uid} {
-      allow read: if resource.data.active == true && resource.data.kioskVisible == true;
-      allow write: if false;
+    // Allow public read of users for login screen
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
-    // Everything else requires auth
+
+    // Require auth for all other documents
     match /{document=**} {
       allow read, write: if request.auth != null;
     }
