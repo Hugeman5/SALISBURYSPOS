@@ -1,4 +1,4 @@
-import { onCall } from "firebase-functions/v2/https";
+import {onCall} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 
 type Role = "admin" | "manager" | "cashier" | "waiter" | "kitchen";
@@ -23,50 +23,50 @@ function toExCents(incCents: number, taxRate: number): number {
 }
 
 async function getOrCreateCategoryByName(name?: string | null) {
-  if (!name) return { id: null as string | null, name: null as string | null };
+  if (!name) return {id: null as string | null, name: null as string | null};
   const nameClean = name.trim();
-  if (!nameClean) return { id: null, name: null };
+  if (!nameClean) return {id: null, name: null};
   const nameLower = nameClean.toLowerCase();
-  
+
   const q = await db.collection("categories")
     .where("nameLower", "==", nameLower)
     .limit(1).get();
-    
+
   if (!q.empty) {
     const d = q.docs[0];
-    return { id: d.id, name: d.get("name") as string, nameLower };
+    return {id: d.id, name: d.get("name") as string, nameLower};
   }
-  
+
   const ref = db.collection("categories").doc();
-  await ref.set({ name: nameClean, nameLower, sort: 0 });
-  return { id: ref.id, name: nameClean, nameLower };
+  await ref.set({name: nameClean, nameLower, sort: 0});
+  return {id: ref.id, name: nameClean, nameLower};
 }
 
-export const adminUpsertProduct = onCall({ cors: true }, async (req) => {
+export const adminUpsertProduct = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
 
   const {
     id, name, sku, barcode = null, categoryName = null,
-    trackStock = true, priceInc, costInc = "", taxRate = 0.15
+    trackStock = true, priceInc, costInc = "", taxRate = 0.15,
   } = req.data || {};
 
   if (typeof name !== "string" || !name.trim()) throw new Error("name required");
   if (typeof sku !== "string" || !sku.trim()) throw new Error("sku required");
 
   const skuUpper = sku.trim().toUpperCase();
-  const incCents = typeof priceInc === "number"
-    ? Math.round(priceInc) // already cents?
-    : centsFromZarString(String(priceInc));
+  const incCents = typeof priceInc === "number" ?
+    Math.round(priceInc) : // already cents?
+    centsFromZarString(String(priceInc));
   const exCents = toExCents(incCents, Number(taxRate ?? 0.15));
   const costIncCents = costInc ? centsFromZarString(String(costInc)) : null;
 
-  const { id: categoryId, name: categoryResolved } = await getOrCreateCategoryByName(categoryName);
+  const {id: categoryId, name: categoryResolved} = await getOrCreateCategoryByName(categoryName);
 
   // Uniqueness: skuUpper must be unique
   const conflicts = await db.collection("products")
     .where("skuUpper", "==", skuUpper).get();
   if (!conflicts.empty) {
-    const conflict = conflicts.docs.find(d => d.id !== id);
+    const conflict = conflicts.docs.find((d) => d.id !== id);
     if (conflict) throw new Error(`SKU already exists: ${skuUpper}`);
   }
 
@@ -90,28 +90,28 @@ export const adminUpsertProduct = onCall({ cors: true }, async (req) => {
   };
 
   if (id) {
-    await db.collection("products").doc(id).set(data, { merge: true });
-    return { ok: true, id };
+    await db.collection("products").doc(id).set(data, {merge: true});
+    return {ok: true, id};
   } else {
     const ref = db.collection("products").doc();
-    await ref.set({ ...data, createdAt: admin.firestore.FieldValue.serverTimestamp() });
-    return { ok: true, id: ref.id };
+    await ref.set({...data, createdAt: admin.firestore.FieldValue.serverTimestamp()});
+    return {ok: true, id: ref.id};
   }
 });
 
-export const adminDeleteProduct = onCall({ cors: true }, async (req) => {
+export const adminDeleteProduct = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin"]);
-  const { id } = req.data || {};
+  const {id} = req.data || {};
   if (!id) throw new Error("id required");
   await db.collection("products").doc(id).delete();
-  return { ok: true };
+  return {ok: true};
 });
 
-export const adminExportProducts = onCall({ cors: true }, async (req) => {
+export const adminExportProducts = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
   const snap = await db.collection("products").orderBy("nameLower").get();
   const rows: string[] = [
-    "id,name,sku,barcode,category,trackStock,priceIncZAR,costIncZAR,taxRate"
+    "id,name,sku,barcode,category,trackStock,priceIncZAR,costIncZAR,taxRate",
   ];
   for (const d of snap.docs) {
     const v = d.data() as any;
@@ -119,27 +119,27 @@ export const adminExportProducts = onCall({ cors: true }, async (req) => {
     const cost = (v.costIncCents ?? 0) / 100;
     rows.push([
       d.id,
-      `"${(v.name ?? "").replace(/"/g, '""')}"`,
+      `"${(v.name ?? "").replace(/"/g, "\"\"")}"`,
       v.sku ?? "",
       v.barcode ?? "",
-      `"${(v.categoryName ?? "").replace(/"/g, '""')}"`,
+      `"${(v.categoryName ?? "").replace(/"/g, "\"\"")}"`,
       String(!!v.trackStock),
       inc.toFixed(2),
       cost ? cost.toFixed(2) : "",
       String(v.price?.taxRate ?? 0.15),
     ].join(","));
   }
-  return { ok: true, csv: rows.join("\n") };
+  return {ok: true, csv: rows.join("\n")};
 });
 
-export const adminBulkImportProducts = onCall({ cors: true }, async (req) => {
+export const adminBulkImportProducts = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
   const csv: string = req.data?.csv;
   if (!csv || typeof csv !== "string") throw new Error("CSV required");
 
   const lines = csv.trim().split(/\r?\n/);
   const [header, ...rows] = lines;
-  const head = header.split(",").map(s => s.trim().toLowerCase());
+  const head = header.split(",").map((s) => s.trim().toLowerCase());
   const col = (k: string) => head.indexOf(k);
 
   const iName = col("name");
@@ -156,12 +156,11 @@ export const adminBulkImportProducts = onCall({ cors: true }, async (req) => {
   }
 
   let imported = 0;
-  const batch = db.batch();
 
   for (const r of rows) {
     if (!r.trim()) continue;
     // Poor man's CSV parsing, assumes no commas in values
-    const p = r.split(",").map(s => s.trim());
+    const p = r.split(",").map((s) => s.trim());
     const name = p[iName];
     const sku = p[iSku];
     const barcode = iBarcode >= 0 ? (p[iBarcode] || null) : null;
@@ -170,18 +169,18 @@ export const adminBulkImportProducts = onCall({ cors: true }, async (req) => {
     const priceInc = p[iInc];
     const costInc = iCost >= 0 ? p[iCost] : "";
     const taxRate = iTax >= 0 && p[iTax] ? Number(p[iTax]) : 0.15;
-    
+
     if (!name || !sku || !priceInc) continue;
 
     // This is not perfectly transactional at scale, but ok for this app.
     // A better approach would be a multi-step import job.
     await adminUpsertProduct.run({
       auth: (req as any).auth, // forward auth context
-      data: { name, sku, barcode, categoryName, trackStock, priceInc, costInc, taxRate }
+      data: {name, sku, barcode, categoryName, trackStock, priceInc, costInc, taxRate},
     } as any);
 
     imported++;
   }
 
-  return { ok: true, imported };
+  return {ok: true, imported};
 });

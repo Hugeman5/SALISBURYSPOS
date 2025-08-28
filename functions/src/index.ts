@@ -1,10 +1,16 @@
-import {onRequest} from "firebase-functions/https";
-import * as logger from "firebase-functions/logger";
+import * as admin from "firebase-admin";
 
-export const ping = onRequest((req, res) => {
-  logger.info("ping", {method: req.method, path: req.path});
-  res.status(200).send("ok");
-});
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 
-export { adminSetUserPin } from "./users";
-export { adminUpsertProduct, adminDeleteProduct, adminExportProducts, adminBulkImportProducts } from "./products";
+// Products
+export {
+  adminUpsertProduct,
+  adminDeleteProduct,
+  adminExportProducts,
+  adminBulkImportProducts,
+} from "./products";
+
+// Users
+export {adminSetUserPin} from "./users";
