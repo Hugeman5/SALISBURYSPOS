@@ -4,6 +4,7 @@ import { useAuth } from '@/stores/auth-store';
 
 const cards = [
   { href: '/dashboard/admin/users', title: 'Users & Roles', desc: 'Manage staff, roles & PINs' },
+  { href: '/dashboard/admin/products', title: 'Products', desc: 'Manage products and prices' },
   { href: '/dashboard/admin/timeclock', title: 'Time Clock', desc: 'Clock in/out & shifts' },
   { href: '/dashboard/admin/menu', title: 'Menu & Recipes', desc: 'Recipes, costs, prices (VAT 15%)' },
   { href: '/dashboard/admin/tables', title: 'Table Plan', desc: 'Floorplan & table states' },
