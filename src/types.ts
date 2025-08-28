@@ -1,3 +1,5 @@
+import type { Timestamp } from 'firebase/firestore';
+
 export type Role = 'admin'|'manager'|'cashier'|'waiter'|'kitchen';
 
 export type User = {
@@ -5,5 +7,10 @@ export type User = {
   name: string;
   role: Role;
   active: boolean;
-  pin?: string;        // stored as plain text for demo; move to hashed later
+  pinHash?: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  lastSignInAt?: Timestamp;
+  email?: string;
+  phone?: string;
 };

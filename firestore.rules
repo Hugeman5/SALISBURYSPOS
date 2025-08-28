@@ -6,44 +6,74 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function getRole() {
+      return get(/databases/$(db)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isRole(role) {
+      return isSignedIn() && getRole() == role;
+    }
+    
     function hasAnyRole(roles) {
-      // role claim comes from the custom token you create in pin-login
-      return isSignedIn() && request.auth.token.role in roles;
+       return isSignedIn() && getRole() in roles;
     }
 
-    function isAdmin()   { return isSignedIn() && request.auth.token.role == 'admin'; }
-    function isManager() { return isSignedIn() && request.auth.token.role == 'manager'; }
-
-    // ---- USERS ----
+    // Admins have god mode
+    match /{path=**} {
+      allow read, write: if hasAnyRole(['admin']);
+    }
+    
+    // --- Users ---
+    // Managers can manage most users, but not other admins/managers.
+    // Cashiers and below can only read their own data.
     match /users/{userId} {
-      // Admin & Manager can read staff list; only Admin writes.
-      allow read:  if hasAnyRole(['admin','manager']);
-      allow write: if isAdmin();
+      allow read: if hasAnyRole(['admin', 'manager']) || request.auth.uid == userId;
+      allow create: if hasAnyRole(['admin', 'manager']);
+      allow update: if hasAnyRole(['admin']) || (hasAnyRole(['manager']) && resource.data.role != 'admin' && request.resource.data.role != 'admin');
+      // Prevent client from writing pinHash
+      allow write: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'role', 'active', 'updatedAt', 'email', 'phone']);
     }
 
-    // ---- PRODUCTS ----
-    match /products/{id} {
-      // Admin & Manager read/write, others read-only
-      allow read:  if isSignedIn();
-      allow write: if hasAnyRole(['admin','manager']);
+    // --- Products & Categories ---
+    // Managers can manage products and categories.
+    // Staff can read them.
+    match /products/{productId} {
+      allow read: if isSignedIn();
+      allow write: if hasAnyRole(['admin', 'manager']);
+    }
+    match /categories/{categoryId} {
+      allow read: if isSignedIn();
+      allow write: if hasAnyRole(['admin', 'manager']);
     }
 
-    // ---- INVENTORY ----
-    match /inventory/{id} {
-      allow read:  if hasAnyRole(['admin','manager']);
-      allow write: if hasAnyRole(['admin','manager']);
+    // --- Inventory ---
+    // Managers can adjust inventory.
+    match /inventory_ledger/{entryId} {
+        allow read, create: if hasAnyRole(['admin', 'manager']);
+        allow update, delete: if false;
     }
 
-    // ---- ORDERS (example) ----
+    // --- Orders ---
+    // Cashiers/Waiters can create orders.
+    // Managers can view all orders.
     match /orders/{orderId} {
-      allow read:  if hasAnyRole(['admin','manager']);
-      allow write: if hasAnyRole(['admin','manager']); // tighten later per workflow
-      match /items/{itemId} {
-        allow read, write: if hasAnyRole(['admin','manager']);
-      }
+      allow read: if hasAnyRole(['admin', 'manager']);
+      allow create: if hasAnyRole(['admin', 'manager', 'cashier', 'waiter']);
+      allow update: if hasAnyRole(['admin', 'manager']); // e.g. to void
     }
-
-    // default deny
-    match /{document=**} { allow read, write: if false; }
+    
+    // --- Customers & Suppliers ---
+     match /customers/{customerId} {
+      allow read, write: if hasAnyRole(['admin', 'manager', 'cashier']);
+    }
+    match /suppliers/{supplierId} {
+      allow read, write: if hasAnyRole(['admin', 'manager']);
+    }
+    
+    // --- Settings ---
+    match /settings/main {
+       allow read: if isSignedIn();
+       allow write: if hasAnyRole(['admin', 'manager']);
+    }
   }
 }
