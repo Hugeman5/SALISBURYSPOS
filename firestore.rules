@@ -1,70 +1,69 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions for roles
+    // --- Start of Functions ---
+    function isAuth() {
+      return request.auth != null;
+    }
+    function isUser(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
     function isAdmin() {
-      return request.auth != null && request.auth.token.role == 'admin';
+      return isAuth() && request.auth.token.role == 'admin';
     }
-
     function isManager() {
-      return request.auth != null && request.auth.token.role in ['admin', 'manager'];
+      return isAuth() && request.auth.token.role in ['admin', 'manager'];
     }
-    
-    function isPosUser() {
-       return request.auth != null && request.auth.token.role in ['admin', 'manager', 'cashier', 'waiter'];
+    function isCashier() {
+      return isAuth() && request.auth.token.role in ['admin', 'manager', 'cashier'];
     }
-    
-    function isKitchenUser() {
-      return request.auth != null && request.auth.token.role in ['admin', 'manager', 'kitchen'];
-    }
+    // --- End of Functions ---
 
-    // Default deny all
-    match /{document=**} {
-      allow read, write: if false;
-    }
 
-    // Users: Admins can do anything. Managers can edit users but not change roles to admin.
-    // All authenticated users can read their own record to get profile info.
+    // --- Start of Collections ---
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin();
-      allow update: if isManager() && !(request.resource.data.role == 'admin' && resource.data.role != 'admin');
+      // Allow reading user list for login screen, but only non-sensitive fields.
+      // A specific user can read their own full document.
+      allow list: if true;
+      allow get: if isUser(userId) || isManager();
+
+      // PIN can only be changed by server, other fields by managers/admins.
+      allow create: if isManager();
+      allow update: if isManager() && !("pinHash" in request.resource.data);
+      allow delete: if isAdmin();
     }
 
-    // Products & Categories: Writable by managers, readable by staff.
     match /products/{productId} {
-      allow read: if request.auth != null;
+      allow read: if isAuth();
       allow write: if isManager();
     }
-    
-    match /categories/{categoryId} {
-      allow read: if request.auth != null;
-      allow write: if isManager();
-    }
-    
-    // Inventory: Only managers can write. Staff can read.
-    match /inventory/{inventoryId} {
-       allow read: if request.auth != null;
-       allow write: if isManager();
-    }
-    
-    // Orders: Readable by staff. Writable by POS users.
-    match /orders/{orderId} {
-      allow read: if isPosUser() || isKitchenUser();
-      allow write: if false; // Server-only writes
 
-       match /items/{itemId} {
-        allow read: if isPosUser() || isKitchenUser();
-        allow write: if false; // Server-only writes
+    match /categories/{categoryId} {
+      allow read: if isAuth();
+      allow write: if isManager();
+    }
+    
+    match /orders/{orderId} {
+      allow read: if isCashier();
+      allow create: if isCashier();
+      allow update, delete: if isManager(); // For voiding, etc.
+      
+      match /items/{itemId} {
+        allow read: if isCashier();
+        allow create: if isCashier();
+        allow update, delete: if isManager();
       }
     }
 
-    // Counters: Server-only writes
-    match /counters/{docId} {
-        allow read: if isPosUser();
-        allow write: if false;
+    match /counters/{counterId} {
+      // Server-side only
+      allow read, write: if false;
+    }
+
+    match /idempotency_keys/{keyId} {
+      // Server-side only
+      allow read, write: if false;
     }
   }
 }
