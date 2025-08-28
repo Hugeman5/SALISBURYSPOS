@@ -4,11 +4,15 @@ import { getFirestore } from 'firebase-admin/firestore';
 
 if (!getApps().length) {
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    initializeApp({ credential: applicationDefault() });
+    // Reads /home/user/serviceAccount.json via application default creds
+    initializeApp({ credential: applicationDefault(), projectId: 'salisburyspos' });
   } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT as string)) as any });
+    initializeApp({
+      credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT as string)),
+      projectId: 'salisburyspos',
+    });
   } else {
-    initializeApp(); // ADC on App Hosting/Cloud
+    console.warn('Admin credentials missing.');
   }
 }
 

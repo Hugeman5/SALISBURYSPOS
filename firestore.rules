@@ -1,9 +1,12 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // By default, allow read/write access only to authenticated users.
-    // You should secure your data further based on your app's needs.
+    // Minimal public read for login tiles
+    match /users/{uid} {
+      allow read: if resource.data.active == true && resource.data.kioskVisible == true;
+      allow write: if false;
+    }
+    // Everything else requires auth
     match /{document=**} {
       allow read, write: if request.auth != null;
     }
