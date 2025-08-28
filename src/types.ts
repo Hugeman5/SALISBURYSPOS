@@ -7,7 +7,7 @@ export type User = {
   name: string;
   role: Role;
   active: boolean;
-  pinHash?: string;
+  avatarUrl?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   lastSignInAt?: Timestamp;

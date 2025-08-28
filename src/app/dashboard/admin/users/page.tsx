@@ -1,24 +1,32 @@
-
 'use client';
 
-import { useEffect, useState } from 'react';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { useEffect, useState, useMemo } from 'react';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { User } from '@/types';
+import type { User, Role } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, UserPlus } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { MoreHorizontal, UserPlus, Search } from 'lucide-react';
 import { useAuth } from '@/stores/auth-store';
 import { format } from 'date-fns';
+import { Input } from '@/components/ui/input';
+import { UserFormDrawer } from '@/components/admin/users/user-form-drawer';
+import { SetPinModal } from '@/components/admin/users/set-pin-modal';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const { role } = useAuth();
-  const canEdit = role === 'admin' || role === 'manager';
+  const [searchTerm, setSearchTerm] = useState('');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [pinModalUser, setPinModalUser] = useState<User | null>(null);
+
+  const { role: currentUserRole } = useAuth();
+  const canDelete = currentUserRole === 'admin';
+  const canEdit = currentUserRole === 'admin' || currentUserRole === 'manager';
 
   useEffect(() => {
     const q = query(collection(db, 'users'), orderBy('name'));
@@ -42,8 +50,54 @@ export default function UsersPage() {
     const userRef = doc(db, 'users', user.id);
     await updateDoc(userRef, { active: !user.active });
   };
-  
-  const roleVariant = (role: string) => {
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!canDelete) return;
+    if (confirm('Are you sure you want to delete this user? This cannot be undone.')) {
+      await deleteDoc(doc(db, 'users', userId));
+      // Note: userSecrets document is orphaned, but secure.
+      // A Cloud Function could be set up to clean this up.
+    }
+  };
+
+  const handleSaveUser = async (userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>, pin: string | undefined) => {
+    if (editingUser) {
+      // Update existing user
+      const userRef = doc(db, 'users', editingUser.id);
+      await updateDoc(userRef, { ...userData, updatedAt: serverTimestamp() });
+    } else {
+      // Create new user
+      await addDoc(collection(db, 'users'), {
+        ...userData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+    
+    // NOTE: This PoC version doesn't handle PIN on create yet.
+    // The `adminSetUserPin` Cloud Function would be needed.
+
+    setDrawerOpen(false);
+    setEditingUser(null);
+  };
+
+  const openDrawerForEdit = (user: User) => {
+    setEditingUser(user);
+    setDrawerOpen(true);
+  };
+
+  const openDrawerForNew = () => {
+    setEditingUser(null);
+    setDrawerOpen(true);
+  };
+
+  const filteredUsers = useMemo(() => {
+    return users.filter(user =>
+      user.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [users, searchTerm]);
+
+  const roleVariant = (role: Role) => {
     switch (role) {
       case 'admin': return 'destructive';
       case 'manager': return 'default';
@@ -53,77 +107,109 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="p-6 space-y-4">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Staff Management</CardTitle>
-              <CardDescription>Add, edit, and manage user accounts and roles.</CardDescription>
-            </div>
-            {canEdit && (
-              <Button>
-                <UserPlus className="mr-2 h-4 w-4" />
-                Add User
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created At</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow><TableCell colSpan={5} className="text-center">Loading...</TableCell></TableRow>
-              ) : (
-                users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.name}</TableCell>
-                    <TableCell>
-                      <Badge variant={roleVariant(user.role)} className="capitalize">{user.role}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={user.active ? 'default' : 'outline'}>
-                        {user.active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {user.createdAt ? format(user.createdAt.toDate(), 'PPP') : 'N/A'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {canEdit && (
-                         <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">Open menu</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Edit</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleToggleActive(user)}>
-                              {user.active ? 'Deactivate' : 'Activate'}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>Reset PIN</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
+    <>
+      <div className="p-6 space-y-4">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Staff Management</CardTitle>
+                <CardDescription>Add, edit, and manage user accounts and roles.</CardDescription>
+              </div>
+              {canEdit && (
+                <Button onClick={openDrawerForNew}>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Add User
+                </Button>
               )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
+            </div>
+            <div className="relative pt-4">
+              <Search className="absolute left-2.5 top-6 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created At</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow><TableCell colSpan={5} className="text-center h-24">Loading users...</TableCell></TableRow>
+                ) : filteredUsers.length > 0 ? (
+                  filteredUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">{user.name}</TableCell>
+                      <TableCell>
+                        <Badge variant={roleVariant(user.role)} className="capitalize">{user.role}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={user.active ? 'default' : 'outline'}>
+                          {user.active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {user.createdAt ? format(user.createdAt.toDate(), 'PPP') : 'N/A'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {canEdit && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openDrawerForEdit(user)}>Edit</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setPinModalUser(user)}>Set PIN</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleToggleActive(user)}>
+                                {user.active ? 'Deactivate' : 'Activate'}
+                              </DropdownMenuItem>
+                              {canDelete && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteUser(user.id)}>Delete</DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow><TableCell colSpan={5} className="text-center h-24">No users found.</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+      <UserFormDrawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onSave={handleSaveUser}
+        user={editingUser}
+        currentUserRole={currentUserRole}
+      />
+      {pinModalUser && (
+        <SetPinModal
+          user={pinModalUser}
+          onClose={() => setPinModalUser(null)}
+        />
+      )}
+    </>
   );
 }
