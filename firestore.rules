@@ -1,40 +1,50 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    function hasRole(allowedRoles) {
+      return isAuthed() && request.auth.token.role in allowedRoles;
+    }
 
     // Public profile docs used by the login grid.
     // DO NOT store pinHash or other secrets here.
     match /users/{uid} {
-      allow get, list: if true;            // allow unauth read for login grid
-      allow create, update, delete: if isAdmin();
+      allow get, list: if true; // allow unauth read for login grid
+      allow create, update, delete: if hasRole(['admin']);
       // Deny direct writes to pinHash from clients
-      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'role', 'active', 'avatarUrl', 'updatedAt']);
+      allow update: if !('pinHash' in request.resource.data.diff(resource.data).affectedKeys());
     }
 
     // Secrets only. Client must never reach this.
     match /userSecrets/{uid} {
-      allow read, write: if false;         // block client entirely
+      allow read, write: if false; // block client entirely
     }
 
     // PRODUCTS
     match /products/{id} {
       allow read: if true;
-      allow create, update: if request.auth != null
-        && (request.auth.token.role in ['admin', 'manager']);
-      allow delete: if request.auth != null
-        && (request.auth.token.role == 'admin'); // delete restricted to admin
+      allow create, update: if hasRole(['admin', 'manager']);
+      allow delete: if hasRole(['admin']);
     }
 
     // CATEGORIES
     match /categories/{id} {
       allow read: if true;
-      allow write: if request.auth != null
-        && (request.auth.token.role in ['admin', 'manager']);
+      allow write: if hasRole(['admin', 'manager']);
     }
-
-    function isAdmin() {
-      return request.auth != null && request.auth.token.role == 'admin';
+    
+    // INVENTORY LEDGER
+    match /inventory_ledger/{docId} {
+      allow read: if isAuthed();
+      // Writes only via privileged roles through Cloud Functions
+      allow create: if hasRole(['admin', 'manager']);
+      allow update, delete: if false; // Append-only
     }
   }
 }

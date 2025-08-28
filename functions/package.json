@@ -1,3 +1,4 @@
+
 {
   "main": "lib/index.js",
   "scripts": {
@@ -19,6 +20,7 @@
     "@genkit-ai/firebase": "^1.17.1",
     "@genkit-ai/vertexai": "^1.17.1",
     "bcryptjs": "^3.0.2",
+    "date-fns": "^3.6.0",
     "express": "^5.1.0",
     "firebase-admin": "^12.6.0",
     "firebase-functions": "^6.0.1",

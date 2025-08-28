@@ -1,3 +1,4 @@
+
 import * as admin from "firebase-admin";
 
 if (!admin.apps.length) {
@@ -14,3 +15,9 @@ export {
 
 // Users
 export {adminSetUserPin} from "./users";
+
+// Inventory
+export {
+  adminPostStockMovement,
+  adminExportLedger,
+} from "./inventory";
