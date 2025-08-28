@@ -3,16 +3,17 @@ import { RoleGate } from '@/components/auth-gate';
 import { useAuth } from '@/stores/auth-store';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Package, Clock, Utensils, LayoutGrid, Receipt, ChefHat, Book, Settings } from 'lucide-react';
+import { Users, Package, Clock, Utensils, LayoutGrid, Receipt, ChefHat, Book, Settings, BarChart3 } from 'lucide-react';
 
 const cards = [
   { href: '/dashboard/admin/users', title: 'Users & Roles', desc: 'Manage staff, roles & PINs', icon: Users },
   { href: '/dashboard/admin/products', title: 'Products', desc: 'Manage products and prices', icon: Package },
   { href: '/dashboard/admin/inventory', title: 'Inventory', desc: 'Track stock levels', icon: LayoutGrid },
+  { href: '/dashboard/admin/orders', title: 'Orders', desc: 'Tickets, payments, ZAR totals', icon: Receipt },
+  { href: '/dashboard/admin/reports', title: 'Reports', desc: 'Daily sales and analytics', icon: BarChart3 },
   { href: '/dashboard/admin/timeclock', title: 'Time Clock', desc: 'Clock in/out & shifts', icon: Clock },
   { href: '/dashboard/admin/menu', title: 'Menu & Recipes', desc: 'Recipes, costs, prices (VAT 15%)', icon: Utensils },
   { href: '/dashboard/admin/tables', title: 'Table Plan', desc: 'Floorplan & table states', icon: LayoutGrid },
-  { href: '/dashboard/admin/orders', title: 'Orders', desc: 'Tickets, payments, ZAR totals', icon: Receipt },
   { href: '/dashboard/admin/kds', title: 'Kitchen Display', desc: 'Bumps & routes', icon: ChefHat },
   { href: '/dashboard/admin/accounting', title: 'Accounting', desc: 'Exports, VAT, day-end', icon: Book },
   { href: '/dashboard/admin/settings', title: 'Settings', desc: 'Business, VAT, printers', icon: Settings }
