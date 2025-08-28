@@ -17,10 +17,7 @@ type User = { id: string; name: string; role: string; active: boolean };
 
 export default function LoginPage() {
   const router = useRouter();
-  const loginWithPin = useAuth(s => s.loginWithPin);
-  const role = useAuth(s => s.role);
-  const profile = useAuth(s => s.profile);
-  const loading = useAuth(s => s.loading);
+  const { loginWithPin, role, profile, loading, hydrated } = useAuth();
 
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -37,13 +34,13 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (profile && role) {
+    if (hydrated && profile && role) {
       const target = role === 'admin' || role === 'manager'
         ? '/dashboard/admin'
         : '/pos';
       router.push(target);
     }
-  }, [profile, role, router]);
+  }, [hydrated, profile, role, router]);
 
   const handleLogin = useCallback(async (currentPin: string) => {
     if (loading || !selectedUser) return;
@@ -52,7 +49,6 @@ export default function LoginPage() {
     const ok = await loginWithPin(selectedUser.id, currentPin);
     if (!ok) {
         setErr('Invalid PIN or server error');
-        // The keypad will handle the visual feedback (shake)
         setTimeout(() => setPin(''), 1000);
     }
   }, [loading, loginWithPin, selectedUser]);
@@ -69,6 +65,16 @@ export default function LoginPage() {
     return () => clearTimeout(handler);
   }, [pin, loading, handleLogin]);
 
+  if (!hydrated) {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-4">
+        <div className="flex items-center gap-2 text-muted-foreground">
+           <LogIn className="h-6 w-6 animate-pulse" />
+           <span>Initializing session...</span>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center p-4">

@@ -20,6 +20,7 @@ type AuthState = {
   profile: Profile | null;
   role: Role | null;
   loading: boolean;
+  hydrated: boolean;
   loginWithPin: (id: string, pin: string) => Promise<boolean>;
   logout: () => Promise<void>;
   setFromFirebase: (fb: FbUser | null) => void;
@@ -31,9 +32,10 @@ export const useAuth = create<AuthState>()(
       profile: null,
       role: null,
       loading: false,
+      hydrated: false,
 
       async loginWithPin(id: string, pin: string) {
-        if (get().loading) return false; // Prevent concurrent attempts
+        if (get().loading) return false;
         set({ loading: true });
         try {
           const res = await fetch('/api/auth/pin-login', {
@@ -52,7 +54,6 @@ export const useAuth = create<AuthState>()(
           const { token } = await res.json(); 
           const cred = await signInWithCustomToken(auth, token);
       
-          // This will trigger onAuthStateChanged, which handles setting profile and role
           await cred.user.getIdTokenResult(true);
 
           return true;
@@ -79,7 +80,6 @@ export const useAuth = create<AuthState>()(
         const roleClaim = (idTokenResult.claims.role as Role) || null;
         set({ role: roleClaim });
         
-        // Fetch user profile from Firestore for rich details
         const userRef = doc(db, 'users', fb.uid);
         const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
@@ -93,7 +93,6 @@ export const useAuth = create<AuthState>()(
                 }
             })
         } else {
-            // Fallback profile if Firestore doc is not found
             set({ profile: { id: fb.uid, name: fb.displayName || 'User', role: (roleClaim || 'cashier') as Role, active: true } });
         }
       }
@@ -101,19 +100,22 @@ export const useAuth = create<AuthState>()(
     {
       name: 'salisburyspos-auth',
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ profile: s.profile, role: s.role })
+      partialize: (s) => ({ profile: s.profile, role: s.role }),
+      onRehydrateStorage: () => (state) => {
+        if (state) state.hydrated = false;
+      }
     }
   )
 );
 
-// Bootstraps listener (call once on a client root)
 let authListenerAttached = false;
 export function attachAuthListenerOnce() {
   if (typeof window === 'undefined' || authListenerAttached) return;
   authListenerAttached = true;
   
-  const { setFromFirebase } = useAuth.getState();
-  onAuthStateChanged(auth, (user) => {
-    setFromFirebase(user);
+  onAuthStateChanged(auth, async (user) => {
+    const { setFromFirebase } = useAuth.getState();
+    await setFromFirebase(user);
+    useAuth.setState({ hydrated: true });
   });
 }
