@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -42,6 +43,10 @@ export function SetPinModal({ user, onClose }: SetPinModalProps) {
   };
 
   const handleSetPin = async () => {
+    if (pin.length < 4) {
+      setError('PIN must be at least 4 digits.');
+      return;
+    }
     if (pin !== confirmPin) {
       setError('PINs do not match. Please try again.');
       setTimeout(() => {
@@ -63,7 +68,6 @@ export function SetPinModal({ user, onClose }: SetPinModalProps) {
         title: 'PIN Set Successfully',
         description: `The PIN for ${user.name} has been updated.`,
       });
-      setProcessing(false);
       onClose();
     } catch (e: any) {
       console.error('Set PIN failed:', e);
@@ -72,7 +76,8 @@ export function SetPinModal({ user, onClose }: SetPinModalProps) {
         title: 'Failed to Set PIN',
         description: e.message || 'An unexpected error occurred.',
       });
-      setProcessing(false);
+    } finally {
+        setProcessing(false);
     }
   };
   
@@ -108,7 +113,7 @@ export function SetPinModal({ user, onClose }: SetPinModalProps) {
             <Button variant="outline" onClick={reset} disabled={isProcessing}>Reset</Button>
             <Button 
                 onClick={handleSetPin} 
-                disabled={isProcessing || confirmPin.length !== 4 || pin !== confirmPin}
+                disabled={isProcessing || confirmPin.length < 4 || pin !== confirmPin}
             >
                 {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Set PIN

@@ -17,7 +17,7 @@ const db = admin.firestore();
  * Hashes the PIN on the server and stores it in userSecrets/{uid}.
  * Expects: { uid: string, pin: string }
  */
-export const adminSetUserPin = onCall({ cors: true }, async (req) => {
+export const adminSetUserPin = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
   const {uid, pin} = req.data || {};
   if (!uid || typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
@@ -27,9 +27,9 @@ export const adminSetUserPin = onCall({ cors: true }, async (req) => {
   const pinHash = await bcrypt.hash(pin, 10);
 
   await db.collection("userSecrets").doc(String(uid)).set(
-    { pinHash, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
-    { merge: true }
+    {pinHash, updatedAt: admin.firestore.FieldValue.serverTimestamp()},
+    {merge: true}
   );
 
-  return { ok: true };
+  return {ok: true};
 });
