@@ -8,7 +8,7 @@
     "start": "next start -p 3110",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "seed": "node scripts/seed-admin.cjs"
+    "seed": "node scripts/seed.cjs"
   },
   "dependencies": {
     "@dataconnect/generated": "file:dataconnect-generated/js/example-connector",
