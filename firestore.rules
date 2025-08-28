@@ -15,6 +15,10 @@ service cloud.firestore {
       allow read, write: if false;         // block client entirely
     }
 
+    // All other collections are locked down by default.
+    // Add rules for other collections here if needed.
+    // e.g. match /orders/{oid} { ... }
+
     function isAdmin() {
       return request.auth != null && request.auth.token.role == 'admin';
     }

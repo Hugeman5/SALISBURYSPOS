@@ -23,14 +23,10 @@ export async function POST(req: Request) {
 
     const userRef = adminDb.collection('users').doc(id);
     const secretRef = adminDb.collection('userSecrets').doc(id);
-
     const [userSnap, secretSnap] = await Promise.all([userRef.get(), secretRef.get()]);
 
-    if (!userSnap.exists) {
+    if (!userSnap.exists || !secretSnap.exists) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
-    }
-    if (!secretSnap.exists) {
-      return NextResponse.json({ error: 'Credentials not set' }, { status: 401 });
     }
 
     const user = userSnap.data() as any;
