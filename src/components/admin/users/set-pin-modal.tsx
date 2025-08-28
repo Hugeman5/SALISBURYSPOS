@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { PinKeypad } from '@/components/pin-keypad';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 interface SetPinModalProps {
   user: User;
@@ -54,26 +54,26 @@ export function SetPinModal({ user, onClose }: SetPinModalProps) {
     }
     
     setProcessing(true);
-    // This is where you would call the Cloud Function
-    // For now, we'll simulate it.
-    console.log(`Simulating setting PIN for ${user.id} to ${pin}`);
+    try {
+      const functions = getFunctions();
+      const adminSetUserPin = httpsCallable(functions, 'adminSetUserPin');
+      await adminSetUserPin({ uid: user.id, pin });
 
-    // Fake delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // In a real app:
-    // const result = await adminSetUserPin(user.id, pin);
-    // if (!result.success) {
-    //   toast({ variant: 'destructive', title: 'Error', description: result.error });
-    //   setProcessing(false);
-    // } else { ... }
-
-    toast({
-      title: 'PIN Set Successfully',
-      description: `The PIN for ${user.name} has been updated.`,
-    });
-    setProcessing(false);
-    onClose();
+      toast({
+        title: 'PIN Set Successfully',
+        description: `The PIN for ${user.name} has been updated.`,
+      });
+      setProcessing(false);
+      onClose();
+    } catch (e: any) {
+      console.error('Set PIN failed:', e);
+      toast({
+        variant: 'destructive',
+        title: 'Failed to Set PIN',
+        description: e.message || 'An unexpected error occurred.',
+      });
+      setProcessing(false);
+    }
   };
   
   const reset = () => {
