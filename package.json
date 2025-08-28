@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start -p 3110",
+    "start": "next start -p 3111",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "seed": "node scripts/seed.cjs"
