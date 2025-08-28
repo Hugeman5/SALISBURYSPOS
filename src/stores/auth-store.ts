@@ -26,6 +26,8 @@ type AuthState = {
   setFromFirebase: (fb: FbUser | null) => void;
 };
 
+let controller: AbortController | null = null;
+
 export const useAuth = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -37,11 +39,15 @@ export const useAuth = create<AuthState>()(
       async loginWithPin(id: string, pin: string) {
         if (get().loading) return false;
         set({ loading: true });
+        try { controller?.abort(); } catch {}
+        controller = new AbortController();
+
         try {
           const res = await fetch('/api/auth/pin-login', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ id, pin })
+            body: JSON.stringify({ id, pin }),
+            signal: controller.signal,
           });
       
           if (!res.ok) {
@@ -57,7 +63,11 @@ export const useAuth = create<AuthState>()(
           await cred.user.getIdTokenResult(true);
 
           return true;
-        } catch (e) {
+        } catch (e: any) {
+           if (e.name === 'AbortError') {
+             console.log('PIN login fetch aborted.');
+             return false;
+           }
           console.error('loginWithPin error:', e);
           return false;
         } finally {

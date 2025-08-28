@@ -52,6 +52,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ token, role });
   } catch (e: any) {
     console.error('pin-login error:', e);
-    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
+    const msg = e?.message || 'Internal error';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
