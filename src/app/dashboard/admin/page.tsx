@@ -1,3 +1,4 @@
+
 'use client';
 import { RoleGate } from '@/components/auth-gate';
 import { useAuth } from '@/stores/auth-store';
