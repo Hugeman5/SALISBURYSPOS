@@ -1,17 +1,50 @@
-
 rules_version = '2';
-
 service cloud.firestore {
-  match /databases/{database}/documents {
-    // Allow public read of users for login screen
-    match /users/{userId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+  match /databases/{db}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // Require auth for all other documents
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    function hasAnyRole(roles) {
+      // role claim comes from the custom token you create in pin-login
+      return isSignedIn() && request.auth.token.role in roles;
     }
+
+    function isAdmin()   { return isSignedIn() && request.auth.token.role == 'admin'; }
+    function isManager() { return isSignedIn() && request.auth.token.role == 'manager'; }
+
+    // ---- USERS ----
+    // Allow public read for login screen
+    match /users/{userId} {
+      allow get: if true;
+      allow list: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---- PRODUCTS ----
+    match /products/{id} {
+      // Admin & Manager read/write, others read-only
+      allow read:  if isSignedIn();
+      allow write: if hasAnyRole(['admin','manager']);
+    }
+
+    // ---- INVENTORY ----
+    match /inventory/{id} {
+      allow read:  if hasAnyRole(['admin','manager']);
+      allow write: if hasAnyRole(['admin','manager']);
+    }
+
+    // ---- ORDERS (example) ----
+    match /orders/{orderId} {
+      allow read:  if hasAnyRole(['admin','manager']);
+      allow write: if hasAnySnyRole(['admin','manager']); // tighten later per workflow
+      match /items/{itemId} {
+        allow read, write: if hasAnyRole(['admin','manager']);
+      }
+    }
+
+    // default deny
+    match /{document=**} { allow read, write: if false; }
   }
 }
