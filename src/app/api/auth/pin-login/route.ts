@@ -3,40 +3,55 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { adminDb, adminAuth } from '@/lib/firebase-admin';
+import * as bcrypt from 'bcryptjs';
+import { FieldValue } from 'firebase-admin/firestore';
 
-type Role = 'admin'|'manager'|'cashier'|'waiter'|'kitchen';
-
-export async function POST(req: Request) {
+async function ensureAuthUser(uid: string, displayName?: string) {
   try {
-    const { id, pin } = await req.json();
+    await adminAuth.getUser(uid);
+  } catch {
+    await adminAuth.createUser({ uid, displayName: displayName || uid });
+  }
+}
 
-    if (!id || !pin || String(pin).length !== 4) {
-      return NextResponse.json({ error: 'Missing id or pin' }, { status: 400 });
+export async function POST(request: Request) {
+  try {
+    const { id, pin } = await request.json();
+    if (!id || !pin) return NextResponse.json({ error: 'Missing id or pin' }, { status: 400 });
+
+    const ref = adminDb.collection('users').doc(id);
+    const snap = await ref.get();
+    if (!snap.exists) return NextResponse.json({ error: 'User not found' }, { status: 401 });
+
+    const u = snap.data() as any;
+    if (u.active === false) return NextResponse.json({ error: 'User is inactive' }, { status: 401 });
+
+    const role = (u.role as string) || 'cashier';
+    const pinHash: string | undefined = u.pinHash;
+
+    let ok = false;
+    if (pinHash) {
+      ok = await bcrypt.compare(pin, pinHash);
+    } else if (u.pin) {
+      // Legacy plaintext: accept once, then migrate to hash
+      ok = String(u.pin) === String(pin);
+      if (ok) {
+        const newHash = await bcrypt.hash(String(pin), 10);
+        await ref.set({ pin: FieldValue.delete(), pinHash: newHash }, { merge: true });
+      }
     }
 
-    // 1) Read Firestore ONLY
-    const snap = await adminDb.collection('users').doc(String(id)).get();
-    if (!snap.exists) {
-      return NextResponse.json({ error: 'Invalid PIN or user' }, { status: 401 });
-    }
+    if (!ok) return NextResponse.json({ error: 'Invalid PIN' }, { status: 401 });
 
-    const data = snap.data() as { pin: string; active?: boolean; role?: Role };
-    if (data?.active === false) {
-      return NextResponse.json({ error: 'User is inactive' }, { status: 403 });
-    }
-    if (!data?.pin || String(data.pin) !== String(pin)) {
-      return NextResponse.json({ error: 'Invalid PIN or user' }, { status: 401 });
-    }
+    // Ensure Auth user + set custom claims (persisted)
+    await ensureAuthUser(id, u.name);
+    await adminAuth.setCustomUserClaims(id, { role });
+    // Also embed role in the custom token for immediate availability
+    const token = await adminAuth.createCustomToken(id, { role });
 
-    const role = (data.role ?? 'cashier') as Role;
-
-    // 2) Create custom token **locally** with embedded role claim.
-    // (No Identity Toolkit call required for createCustomToken when using a JSON key)
-    const token = await adminAuth.createCustomToken(String(id), { role });
-
-    return NextResponse.json({ token }); // client will read role from ID token claims
+    return NextResponse.json({ token, role });
   } catch (e: any) {
-    console.error('pin-login failed:', e?.message || e);
+    console.error('pin-login error:', e);
     return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
   }
 }
