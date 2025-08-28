@@ -16,9 +16,8 @@ service cloud.firestore {
 
     // ---- USERS ----
     match /users/{userId} {
-      // Allow anyone to read the user list for the login screen.
-      // Writes are still restricted to admins.
-      allow read: if true;
+      // Admin & Manager can read staff list; only Admin writes.
+      allow read:  if hasAnyRole(['admin','manager']);
       allow write: if isAdmin();
     }
 
@@ -43,5 +42,8 @@ service cloud.firestore {
         allow read, write: if hasAnyRole(['admin','manager']);
       }
     }
+
+    // default deny
+    match /{document=**} { allow read, write: if false; }
   }
 }
