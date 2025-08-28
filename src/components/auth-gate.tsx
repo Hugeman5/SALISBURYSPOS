@@ -6,12 +6,18 @@ import { useRouter } from 'next/navigation';
 export function AuthGate({ children }: { children: ReactNode }) {
   const router = useRouter();
   const profile = useAuth(s => s.profile);
+  const hydrated = useAuth(s => s.hydrated);
 
   useEffect(() => {
-    if (!profile) router.replace('/login');
-  }, [profile, router]);
+    if (hydrated && !profile) {
+      router.replace('/login');
+    }
+  }, [hydrated, profile, router]);
 
-  if (!profile) return <div style={{ padding:24 }}>Checking session…</div>;
+  if (!hydrated || !profile) {
+    return <div style={{ padding: 24 }}>Checking session…</div>;
+  }
+
   return <>{children}</>;
 }
 
