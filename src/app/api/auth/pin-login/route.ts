@@ -2,36 +2,28 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-
-type ReqBody = { id?: string; pin?: string };
-const jerr = (status: number, msg: string) => NextResponse.json({ ok: false, error: msg }, { status });
+import { adminAuth, adminDb } from '@/lib/firebase-admin';
 
 export async function POST(req: Request) {
   try {
-    const body: ReqBody = await req.json().catch(() => ({}));
-    const { id, pin } = body;
-    if (!id || !pin || pin.length !== 4) return jerr(400, 'Missing id or 4-digit pin');
+    const { id, pin } = await req.json().catch(() => ({}));
+    if (!id || !pin) {
+      return NextResponse.json({ error: 'Missing id or pin' }, { status: 400 });
+    }
 
-    const { getAdmin } = await import('@/lib/firebase-admin');
-    const { adminAuth, adminDb } = getAdmin();
+    const doc = await adminDb.collection('users').doc(id).get();
+    if (!doc.exists) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-    const ref = adminDb.collection('users').doc(String(id));
-    const snap = await ref.get();
-    if (!snap.exists) return jerr(404, 'User not found');
+    const u = doc.data() as any;
+    if (!u.active) return NextResponse.json({ error: 'User inactive' }, { status: 403 });
+    if (String(u.pin) !== String(pin)) return NextResponse.json({ error: 'Invalid PIN' }, { status: 401 });
 
-    const u = snap.data() as any;
-    if (u?.active !== true) return jerr(403, 'User is inactive');
-    if (typeof u.pin !== 'string') return jerr(500, 'PIN not set for user');
-    if (u.pin !== pin) return jerr(401, 'Invalid PIN');
-
-    const role = (u.role as string) || 'cashier';
-    const token = await adminAuth.createCustomToken(ref.id, { role });
-    return NextResponse.json({ ok: true, token, role });
+    // Mint a custom token; uid ties to your doc id
+    const uid = `pos:${id}`;
+    const token = await adminAuth.createCustomToken(uid, { role: u.role || 'cashier' });
+    return NextResponse.json({ token, role: u.role || 'cashier' });
   } catch (e: any) {
-    const msg = e?.message || String(e);
-    console.error('pin-login crash:', e);
-    if (msg.includes('ADMIN_CREDENTIALS_MISSING')) return jerr(500, 'Admin credentials missing.');
-    if (msg.includes('ENOENT') && msg.includes('serviceAccount.json')) return jerr(500, 'serviceAccount.json not found at path.');
-    return jerr(500, msg);
+    console.error('pin-login error:', e?.stack || e);
+    return NextResponse.json({ error: e?.message || 'Internal error' }, { status: 500 });
   }
 }
