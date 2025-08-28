@@ -16,7 +16,7 @@ const db = admin.firestore();
 type MovementType = "receive" | "sale" | "refund" | "wastage" | "adjust" | "set";
 
 export const adminPostStockMovement = onCall({cors: true}, async (req) => {
-  const role = requireRole(req, ["admin", "manager"]);
+  requireRole(req, ["admin", "manager"]);
   const userId = req.auth!.uid;
 
   const {
