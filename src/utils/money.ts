@@ -6,7 +6,7 @@ export const VAT_RATE = 0.15; // South Africa 15%
  * @returns A formatted currency string.
  */
 export const fmtZAR = (cents: number) => {
-  const rand = cents / 100;
+  const rand = (cents || 0) / 100;
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(rand);
 };
 
