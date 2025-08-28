@@ -3,20 +3,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Publicly list/select users for the login grid.
-    // (These docs MUST NOT contain secret fields.)
+    // Public profile docs used by the login grid.
+    // DO NOT store pinHash or other secrets here.
     match /users/{uid} {
-      // unauthenticated read allowed so the login page can render
-      allow get, list: if true;
-
-      // only admins can write users from the client
+      allow get, list: if true;            // allow unauth read for login grid
       allow create, update, delete: if isAdmin();
     }
 
-    // All secrets live here. Only Admin SDK (server) can access.
-    // (Admin SDK bypasses rules; client access is fully blocked.)
+    // Secrets only. Client must never reach this.
     match /userSecrets/{uid} {
-      allow read, write: if false;
+      allow read, write: if false;         // block client entirely
     }
 
     function isAdmin() {
