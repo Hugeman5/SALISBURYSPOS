@@ -40,7 +40,7 @@
   ],
   "apphosting": {
     "backendId": "salspos",
-    "rootDir": "/src",
+    "rootDir": "/",
     "ignore": [
       "node_modules",
       ".git",
