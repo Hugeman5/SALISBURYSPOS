@@ -1,69 +1,26 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Start of Functions ---
-    function isAuth() {
-      return request.auth != null;
+    // Publicly list/select users for the login grid.
+    // (These docs MUST NOT contain secret fields.)
+    match /users/{uid} {
+      // unauthenticated read allowed so the login page can render
+      allow get, list: if true;
+
+      // only admins can write users from the client
+      allow create, update, delete: if isAdmin();
     }
-    function isUser(uid) {
-      return isAuth() && request.auth.uid == uid;
+
+    // All secrets live here. Only Admin SDK (server) can access.
+    // (Admin SDK bypasses rules; client access is fully blocked.)
+    match /userSecrets/{uid} {
+      allow read, write: if false;
     }
+
     function isAdmin() {
-      return isAuth() && request.auth.token.role == 'admin';
-    }
-    function isManager() {
-      return isAuth() && request.auth.token.role in ['admin', 'manager'];
-    }
-    function isCashier() {
-      return isAuth() && request.auth.token.role in ['admin', 'manager', 'cashier'];
-    }
-    // --- End of Functions ---
-
-
-    // --- Start of Collections ---
-    match /users/{userId} {
-      // Allow reading user list for login screen, but only non-sensitive fields.
-      // A specific user can read their own full document.
-      allow list: if true;
-      allow get: if isUser(userId) || isManager();
-
-      // PIN can only be changed by server, other fields by managers/admins.
-      allow create: if isManager();
-      allow update: if isManager() && !("pinHash" in request.resource.data);
-      allow delete: if isAdmin();
-    }
-
-    match /products/{productId} {
-      allow read: if isAuth();
-      allow write: if isManager();
-    }
-
-    match /categories/{categoryId} {
-      allow read: if isAuth();
-      allow write: if isManager();
-    }
-    
-    match /orders/{orderId} {
-      allow read: if isCashier();
-      allow create: if isCashier();
-      allow update, delete: if isManager(); // For voiding, etc.
-      
-      match /items/{itemId} {
-        allow read: if isCashier();
-        allow create: if isCashier();
-        allow update, delete: if isManager();
-      }
-    }
-
-    match /counters/{counterId} {
-      // Server-side only
-      allow read, write: if false;
-    }
-
-    match /idempotency_keys/{keyId} {
-      // Server-side only
-      allow read, write: if false;
+      return request.auth != null && request.auth.token.role == 'admin';
     }
   }
 }
