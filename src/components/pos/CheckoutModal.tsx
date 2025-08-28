@@ -16,15 +16,13 @@ import { fmtZAR, parseToCents } from '@/utils/money';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-
-// Need to install uuid: npm i uuid && npm i --save-dev @types/uuid
-// The system will handle this automatically.
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   cart: CartLineItem[];
-  totals: { subtotal: number; tax: number; total: number };
+  totals: { subTotalEx: number; vat: number; totalInc: number };
   cashierId: string;
   onSuccess: () => void;
 }
@@ -33,12 +31,15 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, onSucc
   const { toast } = useToast();
   const [amountTenderedStr, setAmountTenderedStr] = useState('');
   const [isProcessing, setProcessing] = useState(false);
+  const [orderId, setOrderId] = useState<string | null>(null);
 
   const amountTendered = useMemo(() => parseToCents(amountTenderedStr), [amountTenderedStr]);
-  const changeDue = useMemo(() => Math.max(0, amountTendered - totals.total), [amountTendered, totals.total]);
+  const changeDue = useMemo(() => Math.max(0, amountTendered - totals.totalInc), [amountTendered, totals.totalInc]);
+  
+  const functions = getFunctions();
 
   const handleFinalize = async () => {
-    if (amountTendered < totals.total) {
+    if (amountTendered < totals.totalInc) {
       toast({
         variant: 'destructive',
         title: 'Insufficient Amount',
@@ -49,42 +50,33 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, onSucc
 
     setProcessing(true);
     
-    const payload = {
-      clientRequestId: uuidv4(),
-      status: 'final',
-      registerId: 'REG-01',
-      cashierId,
-      items: cart.map(item => ({
-        productId: item.productId,
-        qty: item.qty,
-        lineDiscount: item.lineDiscount,
-      })),
-      payment: {
-        method: 'cash',
-        amountTendered,
-      },
-    };
-
     try {
-      const response = await fetch('/api/pos/order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+      const cashierCreateOrder = httpsCallable(functions, 'cashierCreateOrder');
+      const { data: createData } = await cashierCreateOrder({});
+      const newOrderId = (createData as any).orderId;
+      if (!newOrderId) throw new Error("Failed to create order.");
+
+      const cashierSetItems = httpsCallable(functions, 'cashierSetItems');
+      await cashierSetItems({ 
+        orderId: newOrderId,
+        items: cart.map(item => ({ productId: item.productId, qty: item.qty })) 
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || `HTTP error! status: ${response.status}`);
-      }
+      const cashierTakePayment = httpsCallable(functions, 'cashierTakePayment');
+      await cashierTakePayment({
+        orderId: newOrderId,
+        type: 'cash',
+        amount: amountTendered
+      });
       
+      const cashierCloseOrder = httpsCallable(functions, 'cashierCloseOrder');
+      await cashierCloseOrder({ orderId: newOrderId });
+
       toast({
         title: "Sale Successful",
-        description: `Order #${result.number} created. Change due: ${fmtZAR(changeDue)}`,
+        description: `Change due: ${fmtZAR(changeDue)}`,
       });
       onSuccess();
-      onClose();
-      setAmountTenderedStr('');
 
     } catch (error: any) {
       console.error('Failed to finalize order:', error);
@@ -99,12 +91,12 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, onSucc
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Checkout</DialogTitle>
           <DialogDescription>
-            Total amount due: <span className="font-bold text-foreground">{fmtZAR(totals.total)}</span>
+            Total amount due: <span className="font-bold text-foreground">{fmtZAR(totals.totalInc)}</span>
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">

@@ -4,7 +4,8 @@ import { collection, getDocs, query, where, orderBy, limit } from 'firebase/fire
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/stores/auth-store';
 import { RoleGate } from '@/components/auth-gate';
-import { Product, CartLineItem } from '@/types/pos';
+import type { Product } from '@/types';
+import type { CartLineItem } from '@/types/pos';
 import { ProductGrid } from '@/components/pos/ProductGrid';
 import { CartPanel } from '@/components/pos/CartPanel';
 import { Input } from '@/components/ui/input';
@@ -22,7 +23,7 @@ export default function SalePage() {
       try {
         const q = query(
           collection(db, 'products'),
-          where('active', '==', true),
+          where('trackStock', '==', true), // Only show items we can sell
           orderBy('name'),
           limit(100)
         );
@@ -53,10 +54,10 @@ export default function SalePage() {
           {
             productId: product.id,
             name: product.name,
-            unitPrice: product.price,
             qty: 1,
-            lineDiscount: 0,
-            stockQty: product.stockQty,
+            priceInclCents: product.price.incCents,
+            vatRate: product.price.taxRate,
+            stockOnHand: product.stockOnHand ?? 0,
           },
         ];
       }

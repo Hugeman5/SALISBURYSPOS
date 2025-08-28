@@ -1,5 +1,5 @@
 'use client';
-import { Product } from '@/types/pos';
+import type { Product } from '@/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtZAR } from '@/utils/money';
 
@@ -42,8 +42,8 @@ export function ProductGrid({ products, onAddToCart, loading }: ProductGridProps
             <CardTitle className="text-base leading-tight">{product.name}</CardTitle>
           </CardHeader>
           <CardFooter className="p-4 pt-0 flex justify-between items-center">
-            <span className="font-semibold">{fmtZAR(product.price)}</span>
-            <span className="text-xs text-muted-foreground">Stock: {product.stockQty}</span>
+            <span className="font-semibold">{fmtZAR(product.price.incCents)}</span>
+            <span className="text-xs text-muted-foreground">Stock: {product.stockOnHand}</span>
           </CardFooter>
         </Card>
       ))}

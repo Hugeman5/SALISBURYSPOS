@@ -1,50 +1,66 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    function isAuthed() {
-      return request.auth != null;
-    }
-
-    function hasRole(allowedRoles) {
-      return isAuthed() && request.auth.token.role in allowedRoles;
-    }
 
     // Public profile docs used by the login grid.
     // DO NOT store pinHash or other secrets here.
     match /users/{uid} {
-      allow get, list: if true; // allow unauth read for login grid
-      allow create, update, delete: if hasRole(['admin']);
-      // Deny direct writes to pinHash from clients
-      allow update: if !('pinHash' in request.resource.data.diff(resource.data).affectedKeys());
+      allow get, list: if true;            // allow unauth read for login grid
+      allow create, update: if isAdmin() || isManager();
+      allow delete: if isAdmin();
     }
 
     // Secrets only. Client must never reach this.
     match /userSecrets/{uid} {
-      allow read, write: if false; // block client entirely
+      allow read, write: if false;         // block client entirely
     }
 
     // PRODUCTS
     match /products/{id} {
       allow read: if true;
-      allow create, update: if hasRole(['admin', 'manager']);
-      allow delete: if hasRole(['admin']);
+      allow create, update: if isAdmin() || isManager();
+      allow delete: if isAdmin();
     }
 
     // CATEGORIES
     match /categories/{id} {
       allow read: if true;
-      allow write: if hasRole(['admin', 'manager']);
+      allow write: if isAdmin() || isManager();
     }
-    
-    // INVENTORY LEDGER
+
+    // Inventory ledger
     match /inventory_ledger/{docId} {
       allow read: if isAuthed();
-      // Writes only via privileged roles through Cloud Functions
-      allow create: if hasRole(['admin', 'manager']);
-      allow update, delete: if false; // Append-only
+      allow create: if isAdmin() || isManager();
+      allow update, delete: if false; // append-only
+    }
+    
+    // ORDERS
+    match /orders/{id} {
+      allow read: if isStaff();
+      allow write: if false; // all writes via server-side logic
+    }
+    
+    match /orders/{orderId}/items/{itemId} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
+    function isAuthed() {
+      return request.auth != null;
+    }
+    
+    function isStaff() {
+      return isAuthed() && request.auth.token.role in ['cashier','manager','admin'];
+    }
+
+    function isAdmin() {
+      return isAuthed() && request.auth.token.role == 'admin';
+    }
+    
+    function isManager() {
+        return isAuthed() && request.auth.token.role == 'manager';
     }
   }
 }

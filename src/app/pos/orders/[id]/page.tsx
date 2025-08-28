@@ -8,10 +8,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Separator } from '@/components/ui/separator';
 import { fmtZAR } from '@/utils/money';
 import { format } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
 
 export default function OrderDetailPage({ params }: { params: { id: string } }) {
   const [order, setOrder] = useState<Order | null>(null);
-  const [items, setItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,12 +28,6 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         
         const orderData = { id: orderSnap.id, ...orderSnap.data() } as Order;
         setOrder(orderData);
-
-        const itemsRef = collection(db, 'orders', params.id, 'items');
-        const itemsSnap = await getDocs(itemsRef);
-        const itemsData = itemsSnap.docs.map(doc => doc.data() as OrderItem);
-        setItems(itemsData);
-
       } catch (err) {
         setError('Failed to fetch order details.');
         console.error(err);
@@ -53,17 +47,21 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     <div className="container mx-auto p-4 md:p-8">
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
-          <CardTitle>Order {order.number}</CardTitle>
-          <CardDescription>
-            {format(order.createdAt.toDate(), 'PPpp')}
-          </CardDescription>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Order Details</CardTitle>
+              <CardDescription>
+                {order.createdAt ? format(order.createdAt.toDate(), 'PPpp') : ''}
+              </CardDescription>
+            </div>
+            <Badge variant={order.status === 'paid' ? 'default' : 'destructive'} className="capitalize">{order.status}</Badge>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4">
             <div className="text-sm text-muted-foreground">
-              <p>Status: <span className="font-medium text-foreground capitalize">{order.status}</span></p>
-              <p>Cashier ID: {order.cashierId}</p>
-              <p>Register ID: {order.registerId}</p>
+              <p>Order ID: {order.id}</p>
+              <p>Created By: {order.createdBy}</p>
             </div>
             <Separator />
             <Table>
@@ -71,17 +69,17 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                 <TableRow>
                   <TableHead>Item</TableHead>
                   <TableHead className="text-center">Qty</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Price (inc)</TableHead>
+                  <TableHead className="text-right">Total (inc)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.productId}>
+                {order.items.map((item, index) => (
+                  <TableRow key={item.productId + index}>
                     <TableCell>{item.name}</TableCell>
                     <TableCell className="text-center">{item.qty}</TableCell>
-                    <TableCell className="text-right">{fmtZAR(item.unitPrice)}</TableCell>
-                    <TableCell className="text-right">{fmtZAR(item.lineTotal)}</TableCell>
+                    <TableCell className="text-right">{fmtZAR(item.lineTotalInc / item.qty)}</TableCell>
+                    <TableCell className="text-right">{fmtZAR(item.lineTotalInc)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -89,29 +87,25 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             <Separator />
              <div className="space-y-2 text-right">
                 <div className="grid grid-cols-2">
-                    <span className="text-muted-foreground">Subtotal:</span>
-                    <span>{fmtZAR(order.subtotal - order.tax)}</span>
+                    <span className="text-muted-foreground">Subtotal (ex VAT):</span>
+                    <span>{fmtZAR(order.totals.subTotalEx)}</span>
                 </div>
                 <div className="grid grid-cols-2">
-                    <span className="text-muted-foreground">Tax (15%):</span>
-                    <span>{fmtZAR(order.tax)}</span>
+                    <span className="text-muted-foreground">VAT ({order.vatRate * 100}%):</span>
+                    <span>{fmtZAR(order.totals.vat)}</span>
                 </div>
                  <div className="grid grid-cols-2 font-bold text-lg">
                     <span>Total:</span>
-                    <span>{fmtZAR(order.total)}</span>
+                    <span>{fmtZAR(order.totals.totalInc)}</span>
                 </div>
              </div>
-             {order.status === 'final' && order.amountTendered && (
+             {order.status === 'paid' && order.payments.length > 0 && (
                 <>
                 <Separator/>
                 <div className="space-y-2 text-right">
                     <div className="grid grid-cols-2">
                         <span className="text-muted-foreground">Amount Tendered:</span>
-                        <span>{fmtZAR(order.amountTendered)}</span>
-                    </div>
-                    <div className="grid grid-cols-2">
-                        <span className="text-muted-foreground">Change Due:</span>
-                        <span>{fmtZAR(order.changeDue ?? 0)}</span>
+                        <span>{fmtZAR(order.payments.reduce((sum, p) => sum + p.amount, 0))}</span>
                     </div>
                 </div>
                 </>
@@ -119,7 +113,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           </div>
         </CardContent>
         <CardFooter className="text-center text-muted-foreground text-xs">
-          Thank you for your purchase!
+          Thank you!
         </CardFooter>
       </Card>
     </div>
