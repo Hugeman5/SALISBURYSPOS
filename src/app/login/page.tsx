@@ -6,6 +6,10 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/stores/auth-store';
 import { useRouter } from 'next/navigation';
 import { PinKeypad } from '@/components/pin-keypad';
+import { Card, CardHeader, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { LogIn } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 type User = { id: string; name: string; role: string; active: boolean };
 
@@ -17,7 +21,7 @@ export default function LoginPage() {
   const loading = useAuth(s => s.loading);
 
   const [users, setUsers] = useState<User[]>([]);
-  const [selected, setSelected] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,47 +36,53 @@ export default function LoginPage() {
     if (profile && role) {
       const target = role === 'admin' || role === 'manager'
         ? '/dashboard/admin'
-        : role === 'cashier'
-          ? '/pos'
-          : role === 'waiter'
-            ? '/pos'
-            : '/pos';
+        : '/pos';
       router.push(target);
     }
   }, [profile, role, router]);
 
   return (
-    <main style={{ padding: 24 }}>
-      <h1>Login</h1>
-      {err && <p style={{ color:'crimson' }}>{err}</p>}
-
-      {!selected ? (
-        <>
-          <p>Select a user:</p>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))', gap:12 }}>
-            {users.map(u => (
-              <button key={u.id} onClick={()=>setSelected(u)} style={{ textAlign:'left', padding:12, border:'1px solid #ddd', borderRadius:10 }}>
-                <div style={{ fontSize:18, fontWeight:600 }}>{u.name}</div>
-                <div style={{ color:'#666' }}>{u.role}</div>
-              </button>
-            ))}
+    <main className="flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <div className="flex justify-center items-center gap-2 mb-2">
+            <LogIn className="h-8 w-8 text-primary" />
+            <h1 className="text-3xl font-bold">SALISBURYSPOS</h1>
           </div>
-        </>
-      ) : (
-        <div style={{ maxWidth: 360 }}>
-          <p>Enter PIN for <strong>{selected.name}</strong></p>
-          <PinKeypad
-            busy={loading}
-            onSubmit={async (pin) => {
-              setErr(null);
-              const ok = await loginWithPin(selected.id, pin);
-              if (!ok) setErr('Invalid PIN or server error');
-            }}
-          />
-          <button onClick={()=>setSelected(null)} style={{ marginTop:10 }}>Choose different user</button>
-          {err && <p style={{ color:'crimson' }}>{err}</p>}
-        </div>
-      )}
+          <p className="text-muted-foreground text-sm">
+            Blazing Fast Point of Sale
+          </p>
+        </CardHeader>
+        <CardContent>
+          {!selectedUser ? (
+            <div className="space-y-4">
+              <p className="text-center text-muted-foreground">Select a user to begin</p>
+              <div className="grid grid-cols-2 gap-4">
+                {users.map(u => (
+                  <Button key={u.id} variant="outline" className="h-auto p-4 flex flex-col items-start" onClick={() => setSelectedUser(u)}>
+                    <span className="font-semibold text-base">{u.name}</span>
+                    <span className="text-muted-foreground text-sm capitalize">{u.role}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+               <p className="text-center text-muted-foreground">Enter PIN for <span className="font-semibold text-foreground">{selectedUser.name}</span></p>
+              <PinKeypad
+                busy={loading}
+                onSubmit={async (pin) => {
+                  setErr(null);
+                  const ok = await loginWithPin(selectedUser.id, pin);
+                  if (!ok) setErr('Invalid PIN or server error');
+                }}
+              />
+              <Button variant="link" className="w-full" onClick={() => setSelectedUser(null)}>Select different user</Button>
+            </div>
+          )}
+          {err && <Alert variant="destructive" className="mt-4"><AlertDescription>{err}</AlertDescription></Alert>}
+        </CardContent>
+      </Card>
     </main>
   );
 }
