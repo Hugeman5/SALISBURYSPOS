@@ -7,8 +7,7 @@ service cloud.firestore {
     // DO NOT store pinHash or other secrets here.
     match /users/{uid} {
       allow get, list: if true;            // allow unauth read for login grid
-      allow create, delete: if isAdmin();
-      allow update: if isAdmin() || isManager();
+      allow create, update, delete: if isAdminOrManager();
     }
 
     // Secrets only. Client must never reach this.
@@ -16,21 +15,29 @@ service cloud.firestore {
       allow read, write: if false;         // block client entirely
     }
 
-    // Helper functions
-    function isAuthenticated() {
-      return request.auth != null;
+    // PRODUCTS
+    match /products/{id} {
+      allow read: if true;
+      allow create, update: if isAdminOrManager();
+      allow delete: if isAdmin(); // delete restricted to admin
     }
 
-    function hasRole(role) {
-      return isAuthenticated() && request.auth.token.role == role;
+    // CATEGORIES
+    match /categories/{id} {
+      allow read: if true;
+      allow write: if isAdminOrManager();
     }
 
     function isAdmin() {
-      return hasRole('admin');
+      return request.auth != null && request.auth.token.role == 'admin';
     }
 
     function isManager() {
-      return hasRole('manager');
+      return request.auth != null && request.auth.token.role == 'manager';
+    }
+
+    function isAdminOrManager() {
+      return request.auth != null && (request.auth.token.role == 'admin' || request.auth.token.role == 'manager');
     }
   }
 }
