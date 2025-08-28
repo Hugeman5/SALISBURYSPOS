@@ -5,6 +5,7 @@ import { useAuth } from '@/stores/auth-store';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Users, Package, Clock, Utensils, LayoutGrid, Receipt, ChefHat, Book, Settings, BarChart3 } from 'lucide-react';
+import { LogoutButton } from '@/components/auth/logout-button';
 
 const cards = [
   { href: '/dashboard/admin/users', title: 'Users & Roles', desc: 'Manage staff, roles & PINs', icon: Users },
@@ -25,9 +26,12 @@ export default function AdminHome() {
   return (
     <RoleGate allow={['admin','manager']}>
       <main className="p-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <p className="text-muted-foreground">Welcome, {profile?.name}</p>
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+            <p className="text-muted-foreground">Welcome, {profile?.name}</p>
+          </div>
+          <LogoutButton />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {cards.map(c => (

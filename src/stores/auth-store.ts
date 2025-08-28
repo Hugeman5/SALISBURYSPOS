@@ -21,6 +21,7 @@ type AuthState = {
   role: Role | null;
   loading: boolean;
   hydrated: boolean;
+  signingOut: boolean;
   loginWithPin: (id: string, pin: string) => Promise<boolean>;
   logout: () => Promise<void>;
   setFromFirebase: (fb: FbUser | null) => void;
@@ -35,6 +36,7 @@ export const useAuth = create<AuthState>()(
       role: null,
       loading: false,
       hydrated: false,
+      signingOut: false,
 
       async loginWithPin(id: string, pin: string) {
         if (get().loading) return false;
@@ -76,8 +78,15 @@ export const useAuth = create<AuthState>()(
       },
 
       async logout() {
-        await signOut(auth);
-        set({ profile: null, role: null });
+        if (get().signingOut) return;
+        set({ signingOut: true });
+        try {
+          await signOut(auth);
+        } catch (e) {
+          console.error('logout error:', e);
+        } finally {
+          set({ profile: null, role: null, signingOut: false });
+        }
       },
 
       async setFromFirebase(fb) {
