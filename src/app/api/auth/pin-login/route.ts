@@ -1,10 +1,10 @@
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { adminDb, adminAuth } from '@/lib/firebase-admin';
-import * as bcrypt from 'bcryptjs';
-import { FieldValue } from 'firebase-admin/firestore';
+import { adminAuth, adminDb } from '@/lib/firebase-admin';
+import bcrypt from 'bcryptjs';
 
 async function ensureAuthUser(uid: string, displayName?: string) {
   try {
@@ -14,45 +14,47 @@ async function ensureAuthUser(uid: string, displayName?: string) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const { id, pin } = await request.json();
-    if (!id || !pin) return NextResponse.json({ error: 'Missing id or pin' }, { status: 400 });
-
-    const ref = adminDb.collection('users').doc(id);
-    const snap = await ref.get();
-    if (!snap.exists) return NextResponse.json({ error: 'User not found' }, { status: 401 });
-
-    const u = snap.data() as any;
-    if (u.active === false) return NextResponse.json({ error: 'User is inactive' }, { status: 401 });
-
-    const role = (u.role as string) || 'cashier';
-    const pinHash: string | undefined = u.pinHash;
-
-    let ok = false;
-    if (pinHash) {
-      ok = await bcrypt.compare(pin, pinHash);
-    } else if (u.pin) {
-      // Legacy plaintext: accept once, then migrate to hash
-      ok = String(u.pin) === String(pin);
-      if (ok) {
-        const newHash = await bcrypt.hash(String(pin), 10);
-        await ref.set({ pin: FieldValue.delete(), pinHash: newHash }, { merge: true });
-      }
+    const { id, pin } = await req.json().catch(() => ({} as any));
+    if (!id || !pin) {
+      return NextResponse.json({ error: 'Missing id or pin' }, { status: 400 });
     }
 
-    if (!ok) return NextResponse.json({ error: 'Invalid PIN' }, { status: 401 });
+    const userRef = adminDb.collection('users').doc(id);
+    const secretRef = adminDb.collection('userSecrets').doc(id);
 
-    // Ensure Auth user + set custom claims (persisted)
-    await ensureAuthUser(id, u.name);
+    const [userSnap, secretSnap] = await Promise.all([userRef.get(), secretRef.get()]);
+
+    if (!userSnap.exists) {
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    }
+    if (!secretSnap.exists) {
+      return NextResponse.json({ error: 'Credentials not set' }, { status: 401 });
+    }
+
+    const user = userSnap.data() as any;
+    const secret = secretSnap.data() as any;
+
+    if (!user.active) {
+      return NextResponse.json({ error: 'User inactive' }, { status: 403 });
+    }
+
+    const ok = await bcrypt.compare(pin, secret.pinHash);
+    if (!ok) {
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    }
+    
+    // Ensure Auth user exists for token creation
+    await ensureAuthUser(id, user.name);
+
+    const role = (user.role as string) || 'cashier';
     await adminAuth.setCustomUserClaims(id, { role });
-    // Also embed role in the custom token for immediate availability
     const token = await adminAuth.createCustomToken(id, { role });
 
     return NextResponse.json({ token, role });
   } catch (e: any) {
     console.error('pin-login error:', e);
-    const msg = e?.message || 'Internal error';
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
