@@ -1,12 +1,12 @@
 
-import { onCall } from "firebase-functions/v2/https";
+import {onCall} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import { Timestamp } from "firebase-admin/firestore";
-import { db, requireRole } from "./utils";
+import {Timestamp} from "firebase-admin/firestore";
+import {db, requireRole} from "./utils";
 
 /** SA day key of a millis timestamp */
 function saDayKey(ms: number): string {
-  const iso = new Date(ms).toLocaleString("en-US", { timeZone: "Africa/Johannesburg" });
+  const iso = new Date(ms).toLocaleString("en-US", {timeZone: "Africa/Johannesburg"});
   const d = new Date(iso);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -24,12 +24,12 @@ async function getLatestOpen(uid: string) {
   if (snap.empty) return null;
   const doc = snap.docs[0];
   const data = doc.data() as any;
-  if (!data.outAt) return { id: doc.id, data };
+  if (!data.outAt) return {id: doc.id, data};
   return null;
 }
 
 /** Any signed-in staff may clock in/out */
-const STAFF_ROLES = ["admin","manager","cashier","waiter","kitchen"];
+const STAFF_ROLES = ["admin", "manager", "cashier", "waiter", "kitchen"];
 
 export const clockIn = onCall({cors: true}, async (req) => {
   const role = requireRole(req, STAFF_ROLES);
@@ -40,7 +40,7 @@ export const clockIn = onCall({cors: true}, async (req) => {
   // Guard: already clocked in?
   const open = await getLatestOpen(uid);
   if (open) {
-    return { ok: true, already: true, punchId: open.id };
+    return {ok: true, already: true, punchId: open.id};
   }
 
   // Pull a friendly display name/role if you persist them in users/{uid}
@@ -62,7 +62,7 @@ export const clockIn = onCall({cors: true}, async (req) => {
     updatedAt: now,
   });
 
-  return { ok: true, punchId: docRef.id };
+  return {ok: true, punchId: docRef.id};
 });
 
 export const clockOut = onCall({cors: true}, async (req) => {
@@ -71,7 +71,7 @@ export const clockOut = onCall({cors: true}, async (req) => {
 
   const open = await getLatestOpen(uid);
   if (!open) {
-    return { ok: false, error: "No open shift to clock out." };
+    return {ok: false, error: "No open shift to clock out."};
   }
 
   const outAt = Timestamp.now();
@@ -82,14 +82,14 @@ export const clockOut = onCall({cors: true}, async (req) => {
     outAt,
     durationSec,
     updatedAt: outAt,
-  }, { merge: true });
+  }, {merge: true});
 
-  return { ok: true, punchId: open.id, durationSec };
+  return {ok: true, punchId: open.id, durationSec};
 });
 
 /** Admin/Manager CSV export by date range (SA) grouped by uid */
 export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
-  requireRole(req, ["admin","manager"]);
+  requireRole(req, ["admin", "manager"]);
 
   const startMs = Number(req.data?.startMs);
   const endMs = Number(req.data?.endMs);
@@ -125,8 +125,8 @@ export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
   });
 
   // Detailed CSV (per punch) + summary block
-  const header = ["uid","userName","inAtISO","outAtISO","durationHours"];
-  const det = rows.map(r => ([
+  const header = ["uid", "userName", "inAtISO", "outAtISO", "durationHours"];
+  const det = rows.map((r) => ([
     r.uid,
     r.userName,
     new Date(r.inAt).toISOString(),
@@ -134,7 +134,7 @@ export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
     ( (r.durationSec||0) / 3600 ).toFixed(2),
   ].join(",")));
 
-  const summaryHeader = ["uid","totalHours"];
+  const summaryHeader = ["uid", "totalHours"];
   const sum = Object.entries(byUser).map(([uid, secs]) => ([uid, (secs/3600).toFixed(2)].join(",")));
 
   const csv = [
@@ -148,5 +148,5 @@ export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
   ].join("\n");
 
   const fname = `time_${saDayKey(startMs)}_${saDayKey(endMs-1)}.csv`;
-  return { ok: true, filename: fname, csv };
+  return {ok: true, filename: fname, csv};
 });

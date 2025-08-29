@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Users, Package, Clock, Utensils, LayoutGrid, Receipt, ChefHat, Book, Settings, BarChart3, DollarSign } from 'lucide-react';
 import { LogoutButton } from '@/components/auth/logout-button';
+import StaffPayrollCard from '@/components/dashboard/StaffPayrollCard';
 
 const cards = [
   { href: '/dashboard/admin/users', title: 'Users & Roles', desc: 'Manage staff, roles & PINs', icon: Users },
@@ -34,6 +35,11 @@ export default function AdminHome() {
           </div>
           <LogoutButton />
         </div>
+        
+        <div className="mb-6">
+          <StaffPayrollCard />
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {cards.map(c => (
              <Link href={c.href} key={c.href}>

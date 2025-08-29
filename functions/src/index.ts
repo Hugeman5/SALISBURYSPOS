@@ -35,4 +35,4 @@ export {
 // Reports
 export {adminCloseDay, adminExportZCsv} from "./reports";
 
-export { clockIn, clockOut, adminExportTimeCsv } from "./timeclock";
+export {clockIn, clockOut, adminExportTimeCsv} from "./timeclock";
