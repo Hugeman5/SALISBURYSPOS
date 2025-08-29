@@ -41,6 +41,16 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     fetchOrder();
   }, [params.id]);
 
+  useEffect(() => {
+    if (order && !error) {
+        // This is a bit of a hack to trigger print on load for new receipts
+        const isNew = window.location.search.includes('print=true');
+        if (isNew) {
+            setTimeout(() => window.print(), 500);
+        }
+    }
+  }, [order, error]);
+
   if (loading) return <div className="p-6 text-center">Loading order details...</div>;
   if (error) return <div className="p-6 text-center text-destructive">{error}</div>;
   if (!order) return null;

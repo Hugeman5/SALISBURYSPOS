@@ -61,7 +61,7 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, cashie
     
     try {
       const cashierCreateOrder = httpsCallable(functions, 'cashierCreateOrder');
-      const { data: createData } = await cashierCreateOrder({ cashierId, cashierName });
+      const { data: createData } = await cashierCreateOrder({ note: '' });
       const newOrderId = (createData as any).orderId;
       if (!newOrderId) throw new Error("Failed to create order.");
 
@@ -74,7 +74,7 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, cashie
       const cashierTakePayment = httpsCallable(functions, 'cashierTakePayment');
       await cashierTakePayment({
         orderId: newOrderId,
-        type: 'cash',
+        type: 'cash', // Assuming cash for now
         amount: amountTendered
       });
       
@@ -113,7 +113,7 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, cashie
                 </DialogHeader>
                 <div className="py-4 flex justify-center">
                     <Button asChild size="lg">
-                        <Link href={`/pos/orders/${completedOrderId}`} target="_blank">
+                        <Link href={`/pos/orders/${completedOrderId}?print=true`} target="_blank">
                             View Receipt
                         </Link>
                     </Button>

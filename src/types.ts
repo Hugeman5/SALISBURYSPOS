@@ -36,6 +36,7 @@ export type Product = {
     createdAt: Timestamp;
     updatedAt: Timestamp;
     stockOnHand?: number;
+    active: boolean;
 };
 
 export type Category = {
