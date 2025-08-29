@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -11,6 +10,7 @@ import { fmtZAR } from '@/utils/money';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { Calendar as CalendarIcon, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 type SalesSummary = {
   ordersCount: number;
@@ -92,6 +92,9 @@ export default function ReportsPage() {
               <CardDescription>Review sales performance for a selected day.</CardDescription>
             </div>
             <div className="flex items-center gap-2">
+                <Button asChild variant="default">
+                    <Link href="/dashboard/admin/reports/z-close">Z-Close</Link>
+                </Button>
                 <Popover>
                     <PopoverTrigger asChild>
                     <Button

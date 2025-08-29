@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
@@ -9,7 +10,9 @@ import type { CartLineItem } from '@/types/pos';
 import { ProductGrid } from '@/components/pos/ProductGrid';
 import { CartPanel } from '@/components/pos/CartPanel';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Search, DollarSign } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 export default function SalePage() {
   const profile = useAuth(s => s.profile);
@@ -80,15 +83,23 @@ export default function SalePage() {
     <RoleGate allow={['admin', 'manager', 'cashier']}>
       <div className="flex h-screen bg-muted/40">
         <div className="flex flex-col w-3/5 p-4 space-y-4">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search products by name or SKU..."
-              className="pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="flex gap-2">
+            <div className="relative flex-grow">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search products by name or SKU..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+             <Button asChild variant="outline" size="lg">
+              <Link href="/dashboard/admin/cash-register">
+                <DollarSign className="mr-2 h-4 w-4" />
+                Cash Management
+              </Link>
+            </Button>
           </div>
           <ProductGrid products={filteredProducts} onAddToCart={handleAddToCart} loading={loading} />
         </div>

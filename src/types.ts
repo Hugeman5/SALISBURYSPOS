@@ -64,3 +64,46 @@ export type InventoryLedger = {
   ts: Timestamp;
   clientTxnId?: string;
 };
+
+export type Register = {
+  id: string;
+  name: string;
+  active: boolean;
+  location?: string;
+};
+
+export type RegisterSession = {
+  id: string;
+  status: "open" | "closed";
+  openedAt: Timestamp;
+  openedBy: { uid: string; name: string };
+  openingFloat: number;
+  expectedCash: number;
+  closedAt?: Timestamp;
+  closedBy?: { uid: string; name: string };
+  countedCash?: number;
+  overShort?: number;
+  note?: string;
+};
+
+export type CashMovement = {
+  id: string;
+  createdAt: Timestamp;
+  by: { uid: string; name: string };
+  type: "payin" | "payout" | "adjustment";
+  amount: number; // positive for IN, negative for OUT
+  reason: string;
+};
+
+export type ZClosure = {
+  id: string; // YYYY-MM-DD
+  createdAt: Timestamp;
+  createdBy: { uid: string; name: string };
+  ordersCount: number;
+  subTotalExcl: number;
+  vatTotal: number;
+  grossTotalIncl: number;
+  paymentsByMethod: { [key: string]: number };
+  perRegister: { [key: string]: { sessions: number; cashMovementsTotal: number; overShort: number } };
+  notes?: string;
+};

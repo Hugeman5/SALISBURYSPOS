@@ -4,7 +4,7 @@ import { RoleGate } from '@/components/auth-gate';
 import { useAuth } from '@/stores/auth-store';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Package, Clock, Utensils, LayoutGrid, Receipt, ChefHat, Book, Settings, BarChart3 } from 'lucide-react';
+import { Users, Package, Clock, Utensils, LayoutGrid, Receipt, ChefHat, Book, Settings, BarChart3, DollarSign } from 'lucide-react';
 import { LogoutButton } from '@/components/auth/logout-button';
 
 const cards = [
@@ -13,6 +13,7 @@ const cards = [
   { href: '/dashboard/admin/inventory', title: 'Inventory', desc: 'Track stock levels', icon: LayoutGrid },
   { href: '/dashboard/admin/orders', title: 'Orders', desc: 'View tickets, payments, totals', icon: Receipt },
   { href: '/dashboard/admin/reports', title: 'Reports', desc: 'Daily sales and analytics', icon: BarChart3 },
+  { href: '/dashboard/admin/cash-register', title: 'Cash Register', desc: 'Manage cash drawer and floats', icon: DollarSign },
   { href: '/dashboard/admin/timeclock', title: 'Time Clock', desc: 'Clock in/out & shifts', icon: Clock },
   { href: '/dashboard/admin/menu', title: 'Menu & Recipes', desc: 'Recipes, costs, prices (VAT 15%)', icon: Utensils },
   { href: '/dashboard/admin/tables', title: 'Table Plan', desc: 'Floorplan & table states', icon: LayoutGrid },
