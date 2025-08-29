@@ -1,10 +1,9 @@
 
-import type {Role} from "./utils";
-
-
 import {onCall} from "firebase-functions/v2/https";
 import {Timestamp} from "firebase-admin/firestore";
 import {db, requireRole} from "./utils";
+import type { Role } from "./utils";
+import { STAFF_ROLES } from "./utils";
 
 /** SA day key of a millis timestamp */
 function saDayKey(ms: number): string {
@@ -30,11 +29,8 @@ async function getLatestOpen(uid: string) {
   return null;
 }
 
-/** Any signed-in staff may clock in/out */
-const STAFF_ROLES: Role[] = ["admin", "manager", "cashier", "waiter", "kitchen"];
-
 export const clockIn = onCall({cors: true}, async (req) => {
-  const role = requireRole(req, STAFF_ROLES);
+  const role: Role = requireRole(req, STAFF_ROLES);
   const uid = req.auth!.uid;
   const now = Timestamp.now();
   const nowMs = now.toMillis();
