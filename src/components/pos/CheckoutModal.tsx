@@ -16,7 +16,6 @@ import { CartLineItem } from '@/types/pos';
 import { fmtZAR, parseToCents } from '@/utils/money';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import Link from 'next/link';
 
@@ -26,10 +25,11 @@ interface CheckoutModalProps {
   cart: CartLineItem[];
   totals: { subTotalEx: number; vat: number; totalInc: number };
   cashierId: string;
+  cashierName: string;
   onSuccess: () => void;
 }
 
-export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, onSuccess }: CheckoutModalProps) {
+export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, cashierName, onSuccess }: CheckoutModalProps) {
   const { toast } = useToast();
   const [amountTenderedStr, setAmountTenderedStr] = useState('');
   const [isProcessing, setProcessing] = useState(false);
@@ -40,11 +40,11 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, onSucc
   
   const functions = getFunctions();
 
-  // Reset state when modal closes
   const handleClose = () => {
-      setAmountTenderedStr('');
-      setCompletedOrderId(null);
-      onClose();
+    setAmountTenderedStr('');
+    setCompletedOrderId(null);
+    setProcessing(false);
+    onClose();
   }
 
   const handleFinalize = async () => {
@@ -60,9 +60,8 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, onSucc
     setProcessing(true);
     
     try {
-      // These Cloud Function names are placeholders. You will need to implement them.
       const cashierCreateOrder = httpsCallable(functions, 'cashierCreateOrder');
-      const { data: createData } = await cashierCreateOrder({ note: '' });
+      const { data: createData } = await cashierCreateOrder({ cashierId, cashierName });
       const newOrderId = (createData as any).orderId;
       if (!newOrderId) throw new Error("Failed to create order.");
 
@@ -86,8 +85,9 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, onSucc
         title: "Sale Successful",
         description: `Change due: ${fmtZAR(changeDue)}`,
       });
-      setCompletedOrderId(newOrderId);
+      
       onSuccess();
+      setCompletedOrderId(newOrderId);
 
     } catch (error: any) {
       console.error('Failed to finalize order:', error);
@@ -96,14 +96,13 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, onSucc
         title: 'Sale Failed',
         description: error.message || 'An unexpected error occurred.',
       });
-    } finally {
       setProcessing(false);
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose() }}>
-      <DialogContent onPointerDownOutside={(e) => { if (completedOrderId) e.preventDefault() }}>
+      <DialogContent onPointerDownOutside={(e) => { if (isProcessing) e.preventDefault() }}>
         {completedOrderId ? (
             <>
                  <DialogHeader>
@@ -120,7 +119,7 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, onSucc
                     </Button>
                 </div>
                 <DialogFooter>
-                    <Button onClick={handleClose}>Close</Button>
+                    <Button onClick={handleClose}>New Sale</Button>
                 </DialogFooter>
             </>
         ) : (

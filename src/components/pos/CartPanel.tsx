@@ -13,9 +13,10 @@ interface CartPanelProps {
   cart: CartLineItem[];
   setCart: React.Dispatch<React.SetStateAction<CartLineItem[]>>;
   cashierId: string;
+  cashierName: string;
 }
 
-export function CartPanel({ cart, setCart, cashierId }: CartPanelProps) {
+export function CartPanel({ cart, setCart, cashierId, cashierName }: CartPanelProps) {
   const { toast } = useToast();
   const [isCheckoutOpen, setCheckoutOpen] = useState(false);
 
@@ -109,9 +110,9 @@ export function CartPanel({ cart, setCart, cashierId }: CartPanelProps) {
         cart={cart}
         totals={totals}
         cashierId={cashierId}
+        cashierName={cashierName}
         onSuccess={() => {
           setCart([]);
-          setCheckoutOpen(false);
         }}
       />
     </>

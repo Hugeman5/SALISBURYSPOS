@@ -102,7 +102,7 @@ export default function OrdersPage() {
                           </TableCell>
                           <TableCell className="text-right font-mono">{fmtZAR(o.totals.totalInc)}</TableCell>
                           <TableCell className="text-right">{o.items.length}</TableCell>
-                          <TableCell>{o.createdBy}</TableCell>
+                          <TableCell>{o.cashierName}</TableCell>
                           <TableCell className="text-right">
                              <Button asChild variant="outline" size="sm">
                                 <Link href={`/pos/orders/${o.id}`}>View</Link>

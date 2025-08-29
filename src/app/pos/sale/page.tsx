@@ -23,7 +23,7 @@ export default function SalePage() {
       try {
         const q = query(
           collection(db, 'products'),
-          where('trackStock', '==', true), // Only show items we can sell
+          where('active', '==', true),
           orderBy('name'),
           limit(100)
         );
@@ -93,7 +93,7 @@ export default function SalePage() {
           <ProductGrid products={filteredProducts} onAddToCart={handleAddToCart} loading={loading} />
         </div>
         <div className="w-2/5 border-l bg-background">
-          <CartPanel cart={cart} setCart={setCart} cashierId={profile.id} />
+          <CartPanel cart={cart} setCart={setCart} cashierId={profile.id} cashierName={profile.name}/>
         </div>
       </div>
     </RoleGate>

@@ -9,6 +9,7 @@ export interface Product {
     taxRate: number;
   };
   stockOnHand: number;
+  active: boolean;
 }
 
 export interface OrderItem {
@@ -42,6 +43,7 @@ export interface Order {
   createdAt: Timestamp;
   closedAt?: Timestamp;
   createdBy: string;
+  cashierName?: string;
   currency: "ZAR";
   vatRate: number;
   note?: string;

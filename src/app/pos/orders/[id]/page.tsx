@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { fmtZAR } from '@/utils/money';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 export default function OrderDetailPage({ params }: { params: { id: string } }) {
   const [order, setOrder] = useState<Order | null>(null);
@@ -46,9 +47,13 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <Card className="max-w-2xl mx-auto">
+      <Card className="max-w-md mx-auto">
         <CardHeader>
-          <div className="flex justify-between items-start">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold">Salisburys POS</h1>
+            <p className="text-sm text-muted-foreground">Receipt</p>
+          </div>
+          <div className="flex justify-between items-start pt-4">
             <div>
               <CardTitle>Order Details</CardTitle>
               <CardDescription>
@@ -61,8 +66,8 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         <CardContent>
           <div className="grid gap-4">
             <div className="text-sm text-muted-foreground">
-              <p>Order ID: {order.id}</p>
-              <p>Created By: {order.createdBy}</p>
+              <p>Order ID: {order.id.slice(0, 8)}</p>
+              <p>Cashier: {order.cashierName}</p>
             </div>
             <Separator />
             <Table>
@@ -70,8 +75,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                 <TableRow>
                   <TableHead>Item</TableHead>
                   <TableHead className="text-center">Qty</TableHead>
-                  <TableHead className="text-right">Price (inc)</TableHead>
-                  <TableHead className="text-right">Total (inc)</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -79,7 +83,6 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                   <TableRow key={item.productId + index}>
                     <TableCell>{item.name}</TableCell>
                     <TableCell className="text-center">{item.qty}</TableCell>
-                    <TableCell className="text-right">{fmtZAR(item.lineTotalInc / item.qty)}</TableCell>
                     <TableCell className="text-right">{fmtZAR(item.lineTotalInc)}</TableCell>
                   </TableRow>
                 ))}
@@ -108,13 +111,18 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                         <span className="text-muted-foreground">Amount Tendered:</span>
                         <span>{fmtZAR(order.payments.reduce((sum, p) => sum + p.amount, 0))}</span>
                     </div>
+                     <div className="grid grid-cols-2">
+                        <span className="text-muted-foreground">Change Due:</span>
+                        <span>{fmtZAR(Math.max(0, order.payments.reduce((sum, p) => sum + p.amount, 0) - order.totals.totalInc))}</span>
+                    </div>
                 </div>
                 </>
              )}
           </div>
         </CardContent>
-        <CardFooter className="text-center text-muted-foreground text-xs">
-          Thank you!
+        <CardFooter className="flex-col gap-2 text-center text-muted-foreground text-xs">
+          <p>Thank you for your purchase!</p>
+          <Button onClick={() => window.print()} variant="outline" className="mt-4 print:hidden">Print Receipt</Button>
         </CardFooter>
       </Card>
     </div>
