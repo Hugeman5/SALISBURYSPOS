@@ -2,7 +2,8 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '@/lib/firebase';
 import type { User, Role } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,7 @@ import { MoreHorizontal, UserPlus, Search } from 'lucide-react';
 import { useAuth } from '@/stores/auth-store';
 import { format } from 'date-fns';
 import { Input } from '@/components/ui/input';
-import { UserFormDrawer } from '@/components/admin/users/user-form-drawer';
+import { UserFormDrawer, UserFormValues } from '@/components/admin/users/user-form-drawer';
 import { SetPinModal } from '@/components/admin/users/set-pin-modal';
 
 export default function UsersPage() {
@@ -55,28 +56,28 @@ export default function UsersPage() {
   const handleDeleteUser = async (userId: string) => {
     if (!canDelete) return;
     if (confirm('Are you sure you want to delete this user? This cannot be undone.')) {
-      await deleteDoc(doc(db, 'users', userId));
-      // Note: userSecrets document is orphaned, but secure.
-      // A Cloud Function could be set up to clean this up.
+      const batch = writeBatch(db);
+      batch.delete(doc(db, 'users', userId));
+      batch.delete(doc(db, 'userSecrets', userId));
+      await batch.commit();
     }
   };
 
-  const handleSaveUser = async (userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>, pin: string | undefined) => {
-    if (editingUser) {
-      // Update existing user
-      const userRef = doc(db, 'users', editingUser.id);
-      await updateDoc(userRef, { ...userData, updatedAt: serverTimestamp() });
-    } else {
-      // Create new user
-      await addDoc(collection(db, 'users'), {
-        ...userData,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    }
+  const handleSaveUser = async (userData: UserFormValues) => {
+    const functions = getFunctions();
+    const call = httpsCallable(functions, 'adminUpsertUser');
     
-    // NOTE: This PoC version doesn't handle PIN on create yet.
-    // The `adminSetUserPin` Cloud Function would be needed.
+    const hourlyRateCents = Math.round(parseFloat(userData.hourlyRateZar || '0') * 100);
+
+    const payload = {
+        ...userData,
+        hourlyRateCents,
+        id: editingUser?.id, // Sent as id, which maps to uid on the backend
+    };
+    
+    // The pin is handled by the SetPinModal, so we don't pass it here.
+    // The backend function is smart enough to not require it.
+    await call(payload);
 
     setDrawerOpen(false);
     setEditingUser(null);
@@ -141,7 +142,7 @@ export default function UsersPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Created At</TableHead>
+                  <TableHead>Hourly Rate</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -161,7 +162,7 @@ export default function UsersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {user.createdAt ? format(user.createdAt.toDate(), 'PPP') : 'N/A'}
+                        {typeof user.hourlyRateCents === 'number' ? `R ${(user.hourlyRateCents / 100).toFixed(2)}` : 'N/A'}
                       </TableCell>
                       <TableCell className="text-right">
                         {canEdit && (

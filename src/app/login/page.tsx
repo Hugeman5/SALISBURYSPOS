@@ -2,8 +2,6 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { useAuth } from '@/stores/auth-store';
 import { useRouter } from 'next/navigation';
 import { PinKeypad } from '@/components/pin-keypad';
@@ -13,7 +11,7 @@ import { LogIn } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AnimatePresence, motion } from 'framer-motion';
 
-type User = { id: string; name: string; role: string; active: boolean };
+type User = { id: string; name: string; role: string; };
 
 export default function LoginPage() {
   const router = useRouter();
@@ -27,10 +25,16 @@ export default function LoginPage() {
 
   useEffect(() => {
     (async () => {
-      const q = query(collection(db, 'users'), where('active', '==', true));
-      const snap = await getDocs(q);
-      setUsers(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
-    })().catch(e => { console.error(e); setErr('Failed to fetch users'); });
+      try {
+        const res = await fetch('/api/auth/loginable-users', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Failed to fetch users');
+        const { users: loginableUsers } = await res.json();
+        setUsers(loginableUsers);
+      } catch (e: any) {
+        console.error(e);
+        setErr('Failed to fetch users');
+      }
+    })()
   }, []);
 
   useEffect(() => {
