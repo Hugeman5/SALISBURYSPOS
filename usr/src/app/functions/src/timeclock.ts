@@ -1,9 +1,7 @@
 
 import {onCall} from "firebase-functions/v2/https";
 import {Timestamp} from "firebase-admin/firestore";
-import {db, requireRole} from "./utils";
-import type { Role } from "./utils";
-import { STAFF_ROLES } from "./utils";
+import {db, requireRole, Role, STAFF_ROLES} from "./utils";
 
 /** SA day key of a millis timestamp */
 function saDayKey(ms: number): string {
@@ -17,16 +15,15 @@ function saDayKey(ms: number): string {
 
 /** Fetch latest punch for uid (order by inAt desc, limit 1) */
 async function getLatestOpen(uid: string) {
-  const snap = await db.collection("time_clock")
-    .where("uid", "==", uid)
+  const snap = await db.collection(`time_clock/${uid}/sessions`)
+    .where("outAt", "==", null)
     .orderBy("inAt", "desc")
     .limit(1)
     .get();
   if (snap.empty) return null;
   const doc = snap.docs[0];
   const data = doc.data() as any;
-  if (!data.outAt) return {id: doc.id, data};
-  return null;
+  return {id: doc.id, data};
 }
 
 export const clockIn = onCall({cors: true}, async (req) => {
@@ -41,20 +38,30 @@ export const clockIn = onCall({cors: true}, async (req) => {
     return {ok: true, already: true, punchId: open.id};
   }
 
-  // Pull a friendly display name/role if you persist them in users/{uid}
+  // Pull user details for name and hourly rate
   let userName = "";
+  let hourlyRateCents = 0;
   try {
-    const u = await db.collection("users").doc(uid).get();
-    userName = (u.exists ? (u.data() as any)?.name : "") || "";
-  } catch {}
+    const userSnap = await db.collection("users").doc(uid).get();
+    if (userSnap.exists) {
+      const userData = userSnap.data() as any;
+      userName = userData.name || "";
+      hourlyRateCents = userData.hourlyRateCents || 0;
+    }
+  } catch (e) {
+    console.error(`Failed to fetch user ${uid} for clock-in:`, e);
+  }
 
-  const docRef = await db.collection("time_clock").add({
+  const docRef = db.collection(`time_clock/${uid}/sessions`).doc();
+  await docRef.set({
     uid,
     userName,
     role,
     inAt: now,
     outAt: null,
     durationSec: null,
+    hourlyRateCentsAtClockIn: hourlyRateCents,
+    costCents: null,
     dateKey: saDayKey(nowMs),
     createdAt: now,
     updatedAt: now,
@@ -76,13 +83,17 @@ export const clockOut = onCall({cors: true}, async (req) => {
   const inAt: Timestamp = open.data.inAt;
   const durationSec = Math.max(0, Math.round((outAt.toMillis() - inAt.toMillis()) / 1000));
 
-  await db.collection("time_clock").doc(open.id).set({
+  const hourlyRate = open.data.hourlyRateCentsAtClockIn || 0;
+  const costCents = Math.round((durationSec / 3600) * hourlyRate);
+
+  await db.collection(`time_clock/${uid}/sessions`).doc(open.id).set({
     outAt,
     durationSec,
+    costCents,
     updatedAt: outAt,
   }, {merge: true});
 
-  return {ok: true, punchId: open.id, durationSec};
+  return {ok: true, punchId: open.id, durationSec, costCents};
 });
 
 /** Admin/Manager CSV export by date range (SA) grouped by uid */
@@ -94,18 +105,18 @@ export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
     throw new Error("Provide startMs and endMs (millis, SA window).");
   }
-  const startTs = Timestamp.fromMillis(startMs);
-  const endTs = Timestamp.fromMillis(endMs);
 
-  // Pull punches that intersect window: inAt >= start && inAt < end
-  const snap = await db.collection("time_clock")
-    .where("inAt", ">=", startTs)
-    .where("inAt", "<", endTs)
+  // Note: This is a collection group query. It requires an index.
+  // The index can be created in the Firebase Console.
+  // Collection ID: sessions, Fields: inAt (ASC), inAt (ASC)
+  const snap = await db.collectionGroup("sessions")
+    .where("inAt", ">=", Timestamp.fromMillis(startMs))
+    .where("inAt", "<", Timestamp.fromMillis(endMs))
     .get();
 
-  type Row = { uid: string; userName: string; inAt: number; outAt: number|null; durationSec: number|null; };
+  type Row = { uid: string; userName: string; inAt: number; outAt: number|null; durationSec: number|null; costCents: number|null; };
   const rows: Row[] = [];
-  const byUser: Record<string, number> = {};
+  const byUser: Record<string, { totalSecs: number, totalCost: number }> = {};
 
   snap.forEach((d) => {
     const x: any = d.data();
@@ -118,22 +129,32 @@ export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
       inAt: inMs,
       outAt: outMs,
       durationSec: dur,
+      costCents: x.costCents || 0,
     });
-    byUser[x.uid] = (byUser[x.uid] || 0) + (dur || 0);
+
+    if (!byUser[x.uid]) byUser[x.uid] = {totalSecs: 0, totalCost: 0};
+    byUser[x.uid]!.totalSecs += dur || 0;
+    byUser[x.uid]!.totalCost += x.costCents || 0;
   });
 
-  // Detailed CSV (per punch) + summary block
-  const header = ["uid", "userName", "inAtISO", "outAtISO", "durationHours"];
+  // Detailed CSV (per punch)
+  const header = ["uid", "userName", "inAtISO", "outAtISO", "durationHours", "costZAR"];
   const det = rows.map((r) => ([
     r.uid,
-    r.userName,
+    `"${r.userName}"`,
     new Date(r.inAt).toISOString(),
     r.outAt ? new Date(r.outAt).toISOString() : "",
     ( (r.durationSec||0) / 3600 ).toFixed(2),
+    ( (r.costCents||0) / 100).toFixed(2),
   ].join(",")));
 
-  const summaryHeader = ["uid", "totalHours"];
-  const sum = Object.entries(byUser).map(([uid, secs]) => ([uid, (secs/3600).toFixed(2)].join(",")));
+  // Summary CSV
+  const summaryHeader = ["uid", "totalHours", "totalCostZAR"];
+  const sum = Object.entries(byUser).map(([uid, totals]) => ([
+    uid,
+    (totals.totalSecs/3600).toFixed(2),
+    (totals.totalCost/100).toFixed(2),
+  ].join(",")));
 
   const csv = [
     "# DETAIL",

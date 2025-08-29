@@ -14,31 +14,31 @@ const db = admin.firestore();
 export const adminSetUserPin = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
   const {uid, pin, hourlyRateZar} = req.data || {};
-  
+
   if (!uid || typeof uid !== "string") {
     throw new Error("uid is required");
   }
 
   const updates: any = {
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   };
 
   if (pin) {
-      if (typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
-        throw new Error("A 4-digit pin is required if provided");
-      }
-      updates.pinHash = await bcrypt.hash(pin, 10);
+    if (typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
+      throw new Error("A 4-digit pin is required if provided");
+    }
+    updates.pinHash = await bcrypt.hash(pin, 10);
   }
-  
+
   if (hourlyRateZar !== undefined) {
-      if (typeof hourlyRateZar !== "number" || hourlyRateZar < 0) {
-        throw new Error("hourlyRateZar must be a non-negative number if provided");
-      }
-      updates.hourlyRateCents = Math.round(hourlyRateZar * 100);
+    if (typeof hourlyRateZar !== "number" || hourlyRateZar < 0) {
+      throw new Error("hourlyRateZar must be a non-negative number if provided");
+    }
+    updates.hourlyRateCents = Math.round(hourlyRateZar * 100);
   }
 
   if (Object.keys(updates).length > 1) { // more than just timestamp
-    await db.collection("userSecrets").doc(uid).set(updates, { merge: true });
+    await db.collection("userSecrets").doc(uid).set(updates, {merge: true});
   }
 
   return {ok: true};

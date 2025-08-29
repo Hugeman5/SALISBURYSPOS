@@ -43,12 +43,12 @@ export const clockIn = onCall({cors: true}, async (req) => {
   try {
     const userSnap = await db.collection("users").doc(uid).get();
     if (userSnap.exists) {
-        const userData = userSnap.data() as any;
-        userName = userData.name || "";
-        hourlyRateCents = userData.hourlyRateCents || 0;
+      const userData = userSnap.data() as any;
+      userName = userData.name || "";
+      hourlyRateCents = userData.hourlyRateCents || 0;
     }
   } catch (e) {
-      console.error(`Failed to fetch user ${uid} for clock-in:`, e);
+    console.error(`Failed to fetch user ${uid} for clock-in:`, e);
   }
 
   const docRef = db.collection(`time_clock/${uid}/sessions`).doc();
@@ -81,7 +81,7 @@ export const clockOut = onCall({cors: true}, async (req) => {
   const outAt = Timestamp.now();
   const inAt: Timestamp = open.data.inAt;
   const durationSec = Math.max(0, Math.round((outAt.toMillis() - inAt.toMillis()) / 1000));
-  
+
   const hourlyRate = open.data.hourlyRateCentsAtClockIn || 0;
   const costCents = Math.round((durationSec / 3600) * hourlyRate);
 
@@ -104,7 +104,7 @@ export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
     throw new Error("Provide startMs and endMs (millis, SA window).");
   }
-  
+
   // Note: This is a collection group query. It requires an index.
   // The index can be created in the Firebase Console.
   // Collection ID: sessions, Fields: inAt (ASC), inAt (ASC)
@@ -130,15 +130,15 @@ export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
       durationSec: dur,
       costCents: x.costCents || 0,
     });
-    
-    if (!byUser[x.uid]) byUser[x.uid] = { totalSecs: 0, totalCost: 0 };
+
+    if (!byUser[x.uid]) byUser[x.uid] = {totalSecs: 0, totalCost: 0};
     byUser[x.uid]!.totalSecs += dur || 0;
     byUser[x.uid]!.totalCost += x.costCents || 0;
   });
 
   // Detailed CSV (per punch)
-  const header = ["uid","userName","inAtISO","outAtISO","durationHours", "costZAR"];
-  const det = rows.map(r => ([
+  const header = ["uid", "userName", "inAtISO", "outAtISO", "durationHours", "costZAR"];
+  const det = rows.map((r) => ([
     r.uid,
     `"${r.userName}"`,
     new Date(r.inAt).toISOString(),
@@ -148,12 +148,12 @@ export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
   ].join(",")));
 
   // Summary CSV
-  const summaryHeader = ["uid","totalHours", "totalCostZAR"];
+  const summaryHeader = ["uid", "totalHours", "totalCostZAR"];
   const sum = Object.entries(byUser).map(([uid, totals]) => ([
-      uid, 
-      (totals.totalSecs/3600).toFixed(2),
-      (totals.totalCost/100).toFixed(2)
-    ].join(",")));
+    uid,
+    (totals.totalSecs/3600).toFixed(2),
+    (totals.totalCost/100).toFixed(2),
+  ].join(",")));
 
   const csv = [
     "# DETAIL",
@@ -166,5 +166,5 @@ export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
   ].join("\n");
 
   const fname = `time_${saDayKey(startMs)}_${saDayKey(endMs-1)}.csv`;
-  return { ok: true, filename: fname, csv };
+  return {ok: true, filename: fname, csv};
 });
