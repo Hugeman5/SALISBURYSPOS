@@ -1,3 +1,4 @@
+
 {
   "indexes": [
     {
@@ -93,29 +94,15 @@
       ]
     },
     {
-      "collectionGroup": "time_clock",
+      "collectionGroup": "sessions",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
         {
-          "fieldPath": "outAt",
+          "fieldPath": "inAt",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "inAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "time_clock",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
           "fieldPath": "outAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "inAt",
           "order": "ASCENDING"
         }
       ]

@@ -12,6 +12,8 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { PinKeypad } from '@/components/pin-keypad';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -25,6 +27,7 @@ interface SetPinModalProps {
 export function SetPinModal({ user, onClose }: SetPinModalProps) {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const [hourlyRateZar, setHourlyRateZar] = useState(String(user.hourlyRateCents ? user.hourlyRateCents / 100 : ''));
   const [step, setStep] = useState<'enter' | 'confirm'>('enter');
   const [isProcessing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +46,7 @@ export function SetPinModal({ user, onClose }: SetPinModalProps) {
   };
 
   const handleSetPin = async () => {
-    if (pin.length < 4) {
+    if (pin.length > 0 && pin.length < 4) {
       setError('PIN must be at least 4 digits.');
       return;
     }
@@ -62,18 +65,22 @@ export function SetPinModal({ user, onClose }: SetPinModalProps) {
     try {
       const functions = getFunctions();
       const adminSetUserPin = httpsCallable(functions, 'adminSetUserPin');
-      await adminSetUserPin({ uid: user.id, pin });
+      const payload: any = { uid: user.id };
+      if (pin) payload.pin = pin;
+      if (hourlyRateZar) payload.hourlyRateZar = parseFloat(hourlyRateZar);
+
+      await adminSetUserPin(payload);
 
       toast({
-        title: 'PIN Set Successfully',
-        description: `The PIN for ${user.name} has been updated.`,
+        title: 'User Updated Successfully',
+        description: `Details for ${user.name} have been updated.`,
       });
       onClose();
     } catch (e: any) {
       console.error('Set PIN failed:', e);
       toast({
         variant: 'destructive',
-        title: 'Failed to Set PIN',
+        title: 'Failed to Update User',
         description: e.message || 'An unexpected error occurred.',
       });
     } finally {
@@ -92,12 +99,22 @@ export function SetPinModal({ user, onClose }: SetPinModalProps) {
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Set PIN for {user.name}</DialogTitle>
+          <DialogTitle>Manage: {user.name}</DialogTitle>
           <DialogDescription>
-            {step === 'enter' ? 'Enter a new 4-digit PIN.' : 'Confirm the new PIN.'}
+            {step === 'enter' ? 'Enter a new 4-digit PIN, or leave blank to keep existing.' : 'Confirm the new PIN.'}
           </DialogDescription>
         </DialogHeader>
-        <div className="py-4">
+        <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="hourly-rate">Hourly Rate (ZAR)</Label>
+              <Input 
+                id="hourly-rate"
+                type="number"
+                placeholder="e.g., 120.50"
+                value={hourlyRateZar}
+                onChange={(e) => setHourlyRateZar(e.target.value)}
+              />
+            </div>
             <PinKeypad
                 pin={step === 'enter' ? pin : confirmPin}
                 onPinChange={handlePinChange}
@@ -113,10 +130,10 @@ export function SetPinModal({ user, onClose }: SetPinModalProps) {
             <Button variant="outline" onClick={reset} disabled={isProcessing}>Reset</Button>
             <Button 
                 onClick={handleSetPin} 
-                disabled={isProcessing || confirmPin.length < 4 || pin !== confirmPin}
+                disabled={isProcessing || (pin.length > 0 && confirmPin.length < 4)}
             >
                 {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Set PIN
+                Save Changes
             </Button>
         </DialogFooter>
       </DialogContent>

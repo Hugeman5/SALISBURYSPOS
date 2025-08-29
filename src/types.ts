@@ -14,6 +14,7 @@ export type User = {
   lastSignInAt?: Timestamp;
   email?: string;
   phone?: string;
+  hourlyRateCents?: number;
 };
 
 export type Product = {

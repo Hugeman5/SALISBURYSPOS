@@ -5,19 +5,21 @@ import React from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app as firebaseApp, db } from '@/lib/firebase';
 import { useAuth } from '@/stores/auth-store';
-import { collection, query, where, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { fmtZAR } from '@/utils/money';
 
 type Punch = {
   id: string;
   inAt: Date;
   outAt?: Date | null;
   durationSec?: number | null;
+  costCents?: number | null;
 };
 
 export default function TimeClockPage() {
@@ -34,18 +36,14 @@ export default function TimeClockPage() {
 
   const refreshState = React.useCallback(async () => {
     if (!uid) return;
-    const snap = await getDocs(query(
-      collection(db, 'time_clock'),
-      where('uid', '==', uid),
+    const q = query(
+      collection(db, `time_clock/${uid}/sessions`),
+      where('outAt', '==', null),
       orderBy('inAt', 'desc'),
       limit(1),
-    ));
-    if (snap.empty) {
-      setIsIn(false);
-      return;
-    }
-    const d: any = snap.docs[0].data();
-    setIsIn(!d.outAt);
+    );
+    const snap = await getDocs(q);
+    setIsIn(!snap.empty);
   }, [uid]);
 
   const loadToday = React.useCallback(async () => {
@@ -54,14 +52,15 @@ export default function TimeClockPage() {
     start.setHours(0, 0, 0, 0);
     const end = new Date();
     end.setHours(24, 0, 0, 0);
-    const snap = await getDocs(query(
-      collection(db, 'time_clock'),
-      where('uid', '==', uid),
+    
+    const q = query(
+      collection(db, `time_clock/${uid}/sessions`),
       where('inAt', '>=', start),
       where('inAt', '<', end),
       orderBy('inAt', 'desc'),
       limit(20),
-    ));
+    );
+    const snap = await getDocs(q);
     const rows: Punch[] = snap.docs.map(doc => {
       const x: any = doc.data();
       return {
@@ -69,6 +68,7 @@ export default function TimeClockPage() {
         inAt: x.inAt?.toDate?.() || new Date(),
         outAt: x.outAt?.toDate?.() || null,
         durationSec: x.durationSec ?? null,
+        costCents: x.costCents ?? null,
       };
     });
     setPunches(rows);
@@ -151,6 +151,7 @@ export default function TimeClockPage() {
       <Card>
         <CardHeader>
           <CardTitle>Time Clock</CardTitle>
+          <CardDescription>Clock in and out for your shift.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex gap-3 items-end mb-6">
@@ -184,13 +185,13 @@ export default function TimeClockPage() {
           
           <Card>
             <CardHeader>
-                <CardTitle>Today's Punches</CardTitle>
+                <CardTitle>Today's Shifts</CardTitle>
             </CardHeader>
             <CardContent>
               {initialLoading ? (
                 <p>Loading punches...</p>
               ) : punches.length === 0 ? (
-                <p className="text-muted-foreground">No punches yet for today.</p>
+                <p className="text-muted-foreground">No shifts recorded for today.</p>
               ) : (
                 <Table>
                   <TableHeader>
@@ -198,6 +199,7 @@ export default function TimeClockPage() {
                       <TableHead>In</TableHead>
                       <TableHead>Out</TableHead>
                       <TableHead>Hours</TableHead>
+                      <TableHead className="text-right">Cost</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -205,7 +207,8 @@ export default function TimeClockPage() {
                       <TableRow key={p.id}>
                         <TableCell>{format(p.inAt, "HH:mm")}</TableCell>
                         <TableCell>{p.outAt ? format(p.outAt, "HH:mm") : "-"}</TableCell>
-                        <TableCell>{((p.durationSec || 0)/3600).toFixed(2)}</TableCell>
+                        <TableCell>{p.outAt ? ((p.durationSec || 0)/3600).toFixed(2) : "-"}</TableCell>
+                        <TableCell className="text-right">{p.outAt ? fmtZAR(p.costCents || 0) : "-"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

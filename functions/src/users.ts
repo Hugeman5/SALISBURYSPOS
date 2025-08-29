@@ -2,35 +2,44 @@
 import {onCall} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import * as bcrypt from "bcryptjs";
-
-type Role = "admin" | "manager" | "cashier" | "waiter" | "kitchen";
-
-function requireRole(context: any, allowed: Role[]) {
-  const role = context?.auth?.token?.role as Role | undefined;
-  if (!role || !allowed.includes(role)) throw new Error("PERMISSION_DENIED");
-  return role;
-}
+import {requireRole} from "./utils";
 
 const db = admin.firestore();
 
 /**
- * Admin/Manager: set/reset a user's PIN.
+ * Admin/Manager: set/reset a user's PIN and optionally their hourly rate.
  * Hashes the PIN on the server and stores it in userSecrets/{uid}.
- * Expects: { uid: string, pin: string }
+ * Expects: { uid: string, pin: string, hourlyRateZar?: number }
  */
 export const adminSetUserPin = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
-  const {uid, pin} = req.data || {};
-  if (!uid || typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
-    throw new Error("uid and a 4-digit pin are required");
+  const {uid, pin, hourlyRateZar} = req.data || {};
+  
+  if (!uid || typeof uid !== "string") {
+    throw new Error("uid is required");
   }
 
-  const pinHash = await bcrypt.hash(pin, 10);
+  const updates: any = {
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  };
 
-  await db.collection("userSecrets").doc(String(uid)).set(
-    {pinHash, updatedAt: admin.firestore.FieldValue.serverTimestamp()},
-    {merge: true}
-  );
+  if (pin) {
+      if (typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
+        throw new Error("A 4-digit pin is required if provided");
+      }
+      updates.pinHash = await bcrypt.hash(pin, 10);
+  }
+  
+  if (hourlyRateZar !== undefined) {
+      if (typeof hourlyRateZar !== "number" || hourlyRateZar < 0) {
+        throw new Error("hourlyRateZar must be a non-negative number if provided");
+      }
+      updates.hourlyRateCents = Math.round(hourlyRateZar * 100);
+  }
+
+  if (Object.keys(updates).length > 1) { // more than just timestamp
+    await db.collection("userSecrets").doc(uid).set(updates, { merge: true });
+  }
 
   return {ok: true};
 });
