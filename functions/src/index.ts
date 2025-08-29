@@ -31,3 +31,6 @@ export {
   getSalesSummary,
   adminExportOrders,
 } from "./orders";
+
+// Reports
+export { adminCloseDay, adminExportZCsv } from "./reports";

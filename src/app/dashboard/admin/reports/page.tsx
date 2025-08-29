@@ -1,170 +1,188 @@
 
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+
+import React from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app as firebaseApp, db } from '@/lib/firebase';
+import { collection, doc, getDoc } from 'firebase/firestore';
+import { useAuth } from '@/stores/auth-store';
+import { format } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
 import { fmtZAR } from '@/utils/money';
-import { format, startOfDay, endOfDay } from 'date-fns';
-import { Calendar as CalendarIcon, Download } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
-type SalesSummary = {
-  ordersCount: number;
-  grossTotalIncl: number;
-  subTotalExcl: number;
-  vatTotal: number;
-  paymentsByMethod: {
-    cash: number;
-    card: number;
-  };
-  avgOrderValue: number;
+type ZTotals = {
+  countPaid: number;
+  gross: number;
+  vat: number;
+  net: number;
+  cash: number;
+  card: number;
+  other: number;
+  discounts: number;
+  returns: number;
 };
 
 export default function ReportsPage() {
-  const [summary, setSummary] = useState<SalesSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [date, setDate] = useState<Date>(new Date());
-  const [error, setError] = useState<string | null>(null);
+  const role = useAuth((s) => s.role);
+  const { toast } = useToast();
+  const [date, setDate] = React.useState<string>(() => format(new Date(), 'yyyy-MM-dd'));
+  const [loading, setLoading] = React.useState(false);
+  const [totals, setTotals] = React.useState<ZTotals | null>(null);
+  const [message, setMessage] = React.useState<string>('');
+  const fns = React.useMemo(() => getFunctions(firebaseApp, 'us-central1'), []);
 
-  const functions = getFunctions();
-  const getSalesSummary = httpsCallable(functions, 'getSalesSummary');
-  const adminExportOrders = httpsCallable(functions, 'adminExportOrders');
-
-  const loadSummary = useCallback(async (selectedDate: Date) => {
+  const loadExisting = React.useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setMessage('');
+    setTotals(null);
     try {
-      const fromISO = startOfDay(selectedDate).toISOString();
-      const toISO = endOfDay(selectedDate).toISOString();
-      const result = await getSalesSummary({ fromISO, toISO });
-      setSummary(result.data as SalesSummary);
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Failed to load sales summary.');
+      const ref = doc(collection(db, 'z_closures'), date);
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        const d: any = snap.data();
+        setTotals(d.totals || null);
+      } else {
+        setMessage('No Z-Report exists for this date.');
+      }
+    } catch (e: any) {
+      setMessage(e.message || 'Failed to load report');
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
       setLoading(false);
     }
-  }, [getSalesSummary]);
+  }, [date, toast]);
 
-  useEffect(() => {
-    loadSummary(date);
-  }, [date, loadSummary]);
-  
-  const handleExport = async () => {
+  async function closeDay() {
+    setLoading(true); setMessage('');
     try {
-        const fromISO = startOfDay(date).toISOString();
-        const toISO = endOfDay(date).toISOString();
-        const result: any = await adminExportOrders({ fromISO, toISO });
-
-        const { filename, mime, dataBase64 } = result.data;
-        const byteCharacters = atob(dataBase64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: mime });
-
-        const link = document.createElement('a');
-        link.href = window.URL.createObjectURL(blob);
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    } catch (err: any) {
-        console.error(err);
-        setError(err.message || 'Failed to export orders.');
+      const callable = httpsCallable(fns, 'adminCloseDay');
+      const res: any = await callable({ date });
+      if (res?.data?.ok) {
+        setTotals(res.data.totals);
+        setMessage('Z-Report generated successfully.');
+        toast({ title: 'Success', description: 'Day-end report has been generated.' });
+      } else {
+        const error = res?.data?.error || 'Failed to close day';
+        setMessage(error);
+        toast({ variant: 'destructive', title: 'Error', description: error });
+      }
+    } catch (e: any) {
+      setMessage(e?.message || String(e));
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
+  async function exportCsv() {
+    setLoading(true); setMessage('');
+    try {
+      const callable = httpsCallable(fns, 'adminExportZCsv');
+      const res: any = await callable({ date });
+      if (res?.data?.ok && res.data.csv) {
+        const blob = new Blob([res.data.csv], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = res.data.filename || `z_${date}.csv`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        setMessage('CSV downloaded.');
+      } else {
+        const error = res?.data?.error || 'Export failed';
+        setMessage(error);
+        toast({ variant: 'destructive', title: 'Error', description: error });
+      }
+    } catch (e: any) {
+      setMessage(e?.message || String(e));
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  React.useEffect(() => { loadExisting(); }, [date, loadExisting]);
+
+  const canClose = role === 'admin' || role === 'manager';
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-6 space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle>Daily Sales Report</CardTitle>
-              <CardDescription>Review sales performance for a selected day.</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-                <Button asChild variant="default">
-                    <Link href="/dashboard/admin/reports/z-close">Z-Close</Link>
-                </Button>
-                <Popover>
-                    <PopoverTrigger asChild>
-                    <Button
-                        variant={"outline"}
-                        className={cn(
-                        "w-[280px] justify-start text-left font-normal",
-                        !date && "text-muted-foreground"
-                        )}
-                    >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {date ? format(date, "PPP") : <span>Pick a date</span>}
-                    </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                    <Calendar
-                        mode="single"
-                        selected={date}
-                        onSelect={(d) => setDate(d || new Date())}
-                        initialFocus
-                    />
-                    </PopoverContent>
-                </Popover>
-                <Button onClick={handleExport} variant="outline">
-                    <Download className="mr-2 h-4 w-4" />
-                    Export CSV
-                </Button>
-            </div>
-          </div>
+          <CardTitle>Daily Sales Reports (Z)</CardTitle>
+          <CardDescription>Generate and view end-of-day sales summaries.</CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
-             <div className="space-y-4 animate-pulse">
-                <div className="h-8 bg-muted rounded w-1/4"></div>
-                <div className="h-24 bg-muted rounded w-full"></div>
-                <div className="h-16 bg-muted rounded w-full"></div>
+          <div className="flex flex-wrap items-end gap-3 mb-6">
+            <div className="space-y-1">
+              <label htmlFor="report-date" className="text-sm font-medium">
+                Report Date (SA)
+              </label>
+              <Input
+                id="report-date"
+                type="date"
+                className="w-auto"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
             </div>
-          ) : error ? (
-            <div className="text-destructive text-center py-10">{error}</div>
-          ) : !summary || summary.ordersCount === 0 ? (
-             <div className="text-center text-muted-foreground py-10">No sales recorded for this date.</div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card>
-                    <CardHeader><CardTitle>Totals</CardTitle></CardHeader>
-                    <CardContent>
-                        <div className="space-y-2">
-                            <div className="flex justify-between"><span>Gross Sales (inc VAT)</span> <span className="font-mono">{fmtZAR(summary.grossTotalIncl)}</span></div>
-                            <div className="flex justify-between text-muted-foreground"><span>Net Sales (ex VAT)</span> <span className="font-mono">{fmtZAR(summary.subTotalExcl)}</span></div>
-                            <div className="flex justify-between text-muted-foreground"><span>VAT (15%)</span> <span className="font-mono">{fmtZAR(summary.vatTotal)}</span></div>
-                        </div>
-                    </CardContent>
+            <Button
+              onClick={loadExisting}
+              disabled={loading}
+            >
+              Refresh
+            </Button>
+            {canClose && (
+              <Button
+                onClick={closeDay}
+                disabled={!canClose || loading}
+                variant="destructive"
+                title={canClose ? 'Generate a new end-of-day report' : 'Only admin/manager can close the day'}
+              >
+                Close Day (Generate Z-Report)
+              </Button>
+            )}
+            <Button
+              onClick={exportCsv}
+              disabled={loading || !totals}
+              variant="secondary"
+            >
+              Export CSV
+            </Button>
+             <Button asChild variant="outline">
+                <Link href="/dashboard/admin/cash-register">Cash Register</Link>
+            </Button>
+          </div>
+
+          {message && <div className="text-sm text-muted-foreground p-4 border rounded-md bg-muted/50">{message}</div>}
+
+          {totals ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {[
+                ["Paid Orders", totals.countPaid],
+                ["Gross Sales", fmtZAR(totals.gross)],
+                ["VAT (15%)", fmtZAR(totals.vat)],
+                ["Net Sales", fmtZAR(totals.net)],
+                ["Cash Payments", fmtZAR(totals.cash)],
+                ["Card Payments", fmtZAR(totals.card)],
+                ["Other Payments", fmtZAR(totals.other)],
+                ["Discounts", fmtZAR(totals.discounts)],
+                ["Returns", fmtZAR(totals.returns)],
+              ].map(([label, value]) => (
+                <Card key={String(label)}>
+                    <CardHeader>
+                        <CardDescription>{String(label)}</CardDescription>
+                        <CardTitle className="text-2xl">{String(value)}</CardTitle>
+                    </CardHeader>
                 </Card>
-                 <Card>
-                    <CardHeader><CardTitle>Order Metrics</CardTitle></CardHeader>
-                    <CardContent>
-                         <div className="space-y-2">
-                            <div className="flex justify-between"><span>Total Orders</span> <span className="font-mono">{summary.ordersCount}</span></div>
-                            <div className="flex justify-between"><span>Avg. Order Value</span> <span className="font-mono">{fmtZAR(summary.avgOrderValue)}</span></div>
-                        </div>
-                    </CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader><CardTitle>Payment Methods</CardTitle></CardHeader>
-                    <CardContent>
-                         <div className="space-y-2">
-                            <div className="flex justify-between"><span>Cash</span> <span className="font-mono">{fmtZAR(summary.paymentsByMethod.cash)}</span></div>
-                            <div className="flex justify-between"><span>Card</span> <span className="font-mono">{fmtZAR(summary.paymentsByMethod.card)}</span></div>
-                        </div>
-                    </CardContent>
-                </Card>
+              ))}
+            </div>
+          ) : !loading && (
+            <div className="text-center text-muted-foreground py-10">
+                No report generated for the selected date.
             </div>
           )}
         </CardContent>
