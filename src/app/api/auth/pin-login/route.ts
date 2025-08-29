@@ -14,19 +14,38 @@ async function ensureAuthUser(uid: string, displayName?: string) {
   }
 }
 
+async function resolveUid(uid?: string, id?: string): Promise<string | null> {
+    if (uid) return uid;
+    if (id) {
+        // First, check if the id is a direct UID
+        const userById = await adminDb.collection('users').doc(id).get();
+        if (userById.exists) return id;
+    }
+    return null;
+}
+
+
 export async function POST(req: Request) {
   try {
-    const { id, pin } = await req.json().catch(() => ({} as any));
-    if (!id || !pin) {
-      return NextResponse.json({ error: 'Missing id or pin' }, { status: 400 });
+    const { uid: reqUid, id: reqId, pin } = await req.json().catch(() => ({} as any));
+    if (!pin) {
+      return NextResponse.json({ error: 'Missing pin' }, { status: 400 });
     }
 
-    const userRef = adminDb.collection('users').doc(id);
-    const secretRef = adminDb.collection('userSecrets').doc(id);
+    const uid = await resolveUid(reqUid, reqId);
+    if (!uid) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const userRef = adminDb.collection('users').doc(uid);
+    const secretRef = adminDb.collection('userSecrets').doc(uid);
     const [userSnap, secretSnap] = await Promise.all([userRef.get(), secretRef.get()]);
 
-    if (!userSnap.exists || !secretSnap.exists) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    if (!userSnap.exists) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    if (!secretSnap.exists) {
+        return NextResponse.json({ error: 'PIN not set for user' }, { status: 401 });
     }
 
     const user = userSnap.data() as any;
@@ -36,19 +55,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'User inactive' }, { status: 403 });
     }
 
+    if (!secret.pinHash) {
+        return NextResponse.json({ error: 'PIN not set for user' }, { status: 401 });
+    }
+
     const ok = await bcrypt.compare(pin, secret.pinHash);
     if (!ok) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
     
     // Ensure Auth user exists for token creation
-    await ensureAuthUser(id, user.name);
+    await ensureAuthUser(uid, user.name);
 
     const role = (user.role as string) || 'cashier';
-    await adminAuth.setCustomUserClaims(id, { role });
-    const token = await adminAuth.createCustomToken(id, { role });
+    await adminAuth.setCustomUserClaims(uid, { role });
+    const token = await adminAuth.createCustomToken(uid, { role });
 
-    return NextResponse.json({ token, role });
+    return NextResponse.json({ token, role, uid });
   } catch (e: any) {
     console.error('pin-login error:', e);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });

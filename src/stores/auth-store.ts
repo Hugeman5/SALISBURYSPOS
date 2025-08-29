@@ -22,7 +22,7 @@ type AuthState = {
   loading: boolean;
   hydrated: boolean;
   signingOut: boolean;
-  loginWithPin: (id: string, pin: string) => Promise<boolean>;
+  loginWithPin: (idOrUid: string, pin: string) => Promise<boolean>;
   logout: () => Promise<void>;
   setFromFirebase: (fb: FbUser | null) => void;
 };
@@ -38,7 +38,7 @@ export const useAuth = create<AuthState>()(
       hydrated: false,
       signingOut: false,
 
-      async loginWithPin(id: string, pin: string) {
+      async loginWithPin(idOrUid: string, pin: string) {
         if (get().loading) return false;
         set({ loading: true });
         try { controller?.abort(); } catch {}
@@ -48,7 +48,7 @@ export const useAuth = create<AuthState>()(
           const res = await fetch('/api/auth/pin-login', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ id, pin }),
+            body: JSON.stringify({ uid: idOrUid, pin }),
             signal: controller.signal,
           });
       
