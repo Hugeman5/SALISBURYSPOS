@@ -2,6 +2,7 @@
 import {onCall} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {z} from "zod";
+import {format} from "date-fns";
 
 type Role = "admin" | "manager" | "cashier" | "waiter" | "kitchen";
 
@@ -199,4 +200,99 @@ export const cashierCloseOrder = onCall({cors: true}, async (req) => {
   await batch.commit();
 
   return {ok: true};
+});
+
+const salesSummarySchema = z.object({
+  fromISO: z.string().datetime(),
+  toISO: z.string().datetime(),
+});
+export const getSalesSummary = onCall({cors: true}, async (req) => {
+  requireRole(req, ["admin", "manager", "cashier"]);
+  const {fromISO, toISO} = salesSummarySchema.parse(req.data);
+
+  const q = db.collection("orders")
+    .where("status", "==", "paid")
+    .where("closedAt", ">=", new Date(fromISO))
+    .where("closedAt", "<=", new Date(toISO));
+
+  const snap = await q.get();
+  if (snap.empty) {
+    return {
+      ordersCount: 0,
+      grossTotalIncl: 0,
+      subTotalExcl: 0,
+      vatTotal: 0,
+      paymentsByMethod: {cash: 0, card: 0},
+      avgOrderValue: 0,
+    };
+  }
+
+  let grossTotalIncl = 0;
+  let subTotalExcl = 0;
+  let vatTotal = 0;
+  const paymentsByMethod = {cash: 0, card: 0};
+
+  snap.forEach((doc) => {
+    const order = doc.data();
+    grossTotalIncl += order.totals.totalInc || 0;
+    subTotalExcl += order.totals.subTotalEx || 0;
+    vatTotal += order.totals.vat || 0;
+    order.payments.forEach((p: any) => {
+      if (p.type === "cash") paymentsByMethod.cash += p.amount;
+      if (p.type === "card") paymentsByMethod.card += p.amount;
+    });
+  });
+
+  return {
+    ordersCount: snap.size,
+    grossTotalIncl,
+    subTotalExcl,
+    vatTotal,
+    paymentsByMethod,
+    avgOrderValue: snap.size > 0 ? grossTotalIncl / snap.size : 0,
+  };
+});
+
+export const adminExportOrders = onCall({cors: true}, async (req) => {
+  requireRole(req, ["admin", "manager"]);
+  const {fromISO, toISO} = salesSummarySchema.parse(req.data);
+
+  const q = db.collection("orders")
+    .where("status", "==", "paid")
+    .where("closedAt", ">=", new Date(fromISO))
+    .where("closedAt", "<=", new Date(toISO))
+    .orderBy("closedAt", "desc");
+
+  const snap = await q.get();
+
+  const rows = [
+    "orderId,createdAt,status,cashierName,subTotalExcl,vatTotal,totalIncl,paymentsTotal,changeDue",
+  ];
+
+  for (const d of snap.docs) {
+    const o = d.data();
+    const paymentsTotal = o.payments.reduce((sum: number, p: any) => sum + p.amount, 0);
+    const changeDue = Math.max(0, paymentsTotal - o.totals.totalInc);
+    rows.push([
+      d.id,
+      o.createdAt.toDate().toISOString(),
+      o.status,
+      `"${(o.cashierName || "").replace(/"/g, "\"\"")}"`,
+      (o.totals.subTotalEx / 100).toFixed(2),
+      (o.totals.vat / 100).toFixed(2),
+      (o.totals.totalInc / 100).toFixed(2),
+      (paymentsTotal / 100).toFixed(2),
+      (changeDue / 100).toFixed(2),
+    ].join(","));
+  }
+
+  const csv = rows.join("\n");
+  const dataBase64 = Buffer.from(csv).toString("base64");
+  const dateStr = format(new Date(fromISO), "yyyy-MM-dd");
+
+  return {
+    filename: `orders-export-${dateStr}.csv`,
+    mime: "text/csv",
+    dataBase64,
+  };
 });
