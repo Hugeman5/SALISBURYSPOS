@@ -31,7 +31,7 @@ async function getLatestOpen(uid: string) {
 }
 
 /** Any signed-in staff may clock in/out */
-const STAFF_ROLES: Role[] = ["admin", "manager", "cashier"];
+const STAFF_ROLES: Role[] = ["admin", "manager", "cashier", "waiter", "kitchen"];
 
 export const clockIn = onCall({cors: true}, async (req) => {
   const role = requireRole(req, STAFF_ROLES);
