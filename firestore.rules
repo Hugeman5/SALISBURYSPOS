@@ -8,65 +8,73 @@ service cloud.firestore {
     function isAuthed() {
       return request.auth != null;
     }
+    
     function hasRole(allowedRoles) {
       return request.auth != null && request.auth.token.role in allowedRoles;
     }
-    function isStaff() {
-      return hasRole(['admin', 'manager', 'cashier', 'waiter', 'kitchen']);
-    }
 
-    // Login page needs to read users to show the list
+    // PUBLIC: Users collection readable for PIN login screen
     match /users/{userId} {
       allow read: if true;
-      allow create, update, delete: if hasRole(['admin']);
-    }
-    match /userSecrets/{userId} {
-      allow read, write: if false; // Server-only
+      allow write: if hasRole(['admin', 'manager']);
     }
     
-    // Products and Categories readable by staff
+    // PROTECTED: User secrets are not readable by clients
+    match /userSecrets/{userId} {
+      allow read, write: if false;
+    }
+    
+    // PROTECTED: Products can be read by any authenticated user, but only written by admin/manager
     match /products/{productId} {
       allow read: if isAuthed();
       allow create, update, delete: if hasRole(['admin', 'manager']);
     }
+
+    // PROTECTED: Categories can be read by any authenticated user, but only written by admin/manager
     match /categories/{categoryId} {
       allow read: if isAuthed();
-      allow create, update, delete: if hasRole(['admin', 'manager']);
+      allow write: if hasRole(['admin', 'manager']);
     }
-    
-    // Inventory ledger is append-only via Functions
+
+    // PROTECTED: Inventory ledger is append-only via functions, readable by staff
     match /inventory_ledger/{docId} {
       allow read: if isAuthed();
-      allow create: if hasRole(['admin','manager']);
+      allow create: if hasRole(['admin', 'manager']);
       allow update, delete: if false;
     }
-
-    // Orders are written by Functions, readable by staff
+    
+    // PROTECTED: Orders are written via functions, readable by staff
     match /orders/{orderId} {
-      allow read: if isStaff();
+      allow read: if isAuthed();
       allow write: if false;
     }
 
-    // Registers and sessions are server-only writes
-    match /registers/{regId} {
-      allow read: if isStaff();
-      allow write: if false;
-
-      match /sessions/{sessId} {
-        allow read: if isStaff();
+    // PROTECTED: Registers and their subcollections are server-write only
+    match /registers/{registerId} {
+        allow read: if hasRole(['admin', 'manager', 'cashier']);
         allow write: if false;
 
-        match /movements/{movId} {
-          allow read: if isStaff();
-          allow write: if false;
+        match /sessions/{sessionId} {
+            allow read: if hasRole(['admin', 'manager', 'cashier']);
+            allow write: if false;
+
+            match /movements/{movementId} {
+                allow read: if hasRole(['admin', 'manager', 'cashier']);
+                allow write: if false;
+            }
         }
-      }
     }
-    
-    // Z-Closures are server-written, staff-read
-    match /z_closures/{date} {
-      allow read: if isStaff();
-      allow write: if false;
+
+    // PROTECTED: Z-Closures are server-written, staff-read
+    match /z_closures/{day} {
+        allow read: if hasRole(['admin', 'manager', 'cashier']);
+        allow write: if false;
+    }
+
+    // PROTECTED: Time Clock entries
+    match /time_clock/{punchId} {
+      allow read: if hasRole(['admin', 'manager']) || (request.auth != null && request.auth.uid == resource.data.uid);
+      allow write: if false; // writes via Cloud Functions only
     }
   }
 }

@@ -1,8 +1,8 @@
 
-import { onCall } from "firebase-functions/v2/https";
+import {onCall} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import { Timestamp } from "firebase-admin/firestore";
-import { db, requireRole } from "./utils";
+import {Timestamp} from "firebase-admin/firestore";
+import {db, requireRole} from "./utils";
 
 /**
  * Utility: SA day window (Africa/Johannesburg) for a given date string 'YYYY-MM-DD'
@@ -11,7 +11,7 @@ import { db, requireRole } from "./utils";
 function saDayWindow(dateStr?: string): { startMs: number; endMs: number; key: string } {
   if (!dateStr) {
     // Default: today in SA time
-    const saNowStr = new Date().toLocaleString("en-US", { timeZone: "Africa/Johannesburg" });
+    const saNowStr = new Date().toLocaleString("en-US", {timeZone: "Africa/Johannesburg"});
     const saNow = new Date(saNowStr);
     const y = saNow.getFullYear();
     const m = saNow.getMonth();
@@ -19,13 +19,13 @@ function saDayWindow(dateStr?: string): { startMs: number; endMs: number; key: s
     const start = new Date(saNow); start.setHours(0, 0, 0, 0);
     const end = new Date(saNow); end.setHours(24, 0, 0, 0);
     const key = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    return { startMs: start.getTime(), endMs: end.getTime(), key };
+    return {startMs: start.getTime(), endMs: end.getTime(), key};
   }
   // Specific date in SA
-  const saMidnightStr = new Date(`${dateStr}T00:00:00`).toLocaleString("en-US", { timeZone: "Africa/Johannesburg" });
+  const saMidnightStr = new Date(`${dateStr}T00:00:00`).toLocaleString("en-US", {timeZone: "Africa/Johannesburg"});
   const start = new Date(saMidnightStr);
   const end = new Date(saMidnightStr); end.setHours(24, 0, 0, 0);
-  return { startMs: start.getTime(), endMs: end.getTime(), key: dateStr };
+  return {startMs: start.getTime(), endMs: end.getTime(), key: dateStr};
 }
 
 /**
@@ -40,11 +40,11 @@ export const adminCloseDay = onCall({cors: true}, async (req) => {
   const dateStr = typeof req.data?.date === "string" ? req.data.date : undefined;
   const window = saDayWindow(dateStr);
   const startMs = typeof req.data?.startMs === "number" ? req.data.startMs : window.startMs;
-  const endMs   = typeof req.data?.endMs === "number" ? req.data.endMs   : window.endMs;
-  const key     = window.key;
+  const endMs = typeof req.data?.endMs === "number" ? req.data.endMs : window.endMs;
+  const key = window.key;
 
   const startTs = Timestamp.fromMillis(startMs);
-  const endTs   = Timestamp.fromMillis(endMs);
+  const endTs = Timestamp.fromMillis(endMs);
 
   // Query orders in the window (range only on 'ts' to avoid composite index requirements)
   const snap = await db.collection("orders")
@@ -73,8 +73,8 @@ export const adminCloseDay = onCall({cors: true}, async (req) => {
 
     const amounts = d.totals || d.amounts || d;
     const gross = Number(amounts.gross ?? amounts.totalGross ?? amounts.totalInc ?? 0) || 0;
-    const vat   = Number(amounts.vat ?? amounts.tax ?? 0) || 0;
-    const net   = Number(amounts.net ?? (gross - vat)) || 0;
+    const vat = Number(amounts.vat ?? amounts.tax ?? 0) || 0;
+    const net = Number(amounts.net ?? (gross - vat)) || 0;
 
     totals.countPaid += 1;
     totals.gross += gross;
@@ -112,15 +112,15 @@ export const adminCloseDay = onCall({cors: true}, async (req) => {
   const docRef = db.collection("z_closures").doc(key);
   await docRef.set({
     key,
-    range: { startMs, endMs },
+    range: {startMs, endMs},
     totals,
     vatRate: 0.15,
     currency: "ZAR",
     closedAt: admin.firestore.FieldValue.serverTimestamp(),
     closedByUid: req.auth?.uid || null,
-  }, { merge: true });
+  }, {merge: true});
 
-  return { ok: true, key, totals };
+  return {ok: true, key, totals};
 });
 
 /**
@@ -135,12 +135,12 @@ export const adminExportZCsv = onCall({cors: true}, async (req) => {
     throw new Error("date (YYYY-MM-DD) is required");
   }
   const doc = await db.collection("z_closures").doc(date).get();
-  if (!doc.exists) return { ok: false, error: "No Z-Report for that date." };
+  if (!doc.exists) return {ok: false, error: "No Z-Report for that date."};
   const d: any = doc.data();
 
   // Very small CSV (one row of totals + header)
   const lines = [
-    ["date","countPaid","gross_cents","vat_cents","net_cents","cash_cents","card_cents","other_cents","discounts_cents","returns_cents","currency","vatRate"],
+    ["date", "countPaid", "gross_cents", "vat_cents", "net_cents", "cash_cents", "card_cents", "other_cents", "discounts_cents", "returns_cents", "currency", "vatRate"],
     [
       date,
       d.totals?.countPaid ?? 0,
@@ -157,5 +157,5 @@ export const adminExportZCsv = onCall({cors: true}, async (req) => {
     ],
   ];
   const csv = lines.map((r) => r.map((x) => String(x)).join(",")).join("\n");
-  return { ok: true, filename: `z_${date}.csv`, csv };
+  return {ok: true, filename: `z_${date}.csv`, csv};
 });
