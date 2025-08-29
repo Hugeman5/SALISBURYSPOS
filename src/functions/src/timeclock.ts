@@ -1,10 +1,7 @@
 
-import type {Role} from "./utils";
-
-
 import {onCall} from "firebase-functions/v2/https";
 import {Timestamp} from "firebase-admin/firestore";
-import {db, requireRole} from "./utils";
+import {db, requireRole, type Role} from "./utils";
 
 /** SA day key of a millis timestamp */
 function saDayKey(ms: number): string {
