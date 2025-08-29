@@ -1,6 +1,6 @@
+
 import {onCall} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import {format} from "date-fns";
 import {z} from "zod";
 
 type Role = "admin" | "manager" | "cashier" | "waiter" | "kitchen";
@@ -25,7 +25,7 @@ const createOrderSchema = z.object({
   note: z.string().optional(),
 });
 export const cashierCreateOrder = onCall({cors: true}, async (req) => {
-  const role = requireRole(req, ["admin", "manager", "cashier"]);
+  requireRole(req, ["admin", "manager", "cashier"]);
   const cashierId = req.auth!.uid;
   const cashierName = req.auth!.token.name || "Unknown";
   const {note} = createOrderSchema.parse(req.data);
