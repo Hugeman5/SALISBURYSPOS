@@ -2,81 +2,67 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function hasRole(allowedRoles) {
-      return request.auth != null && request.auth.token.role in allowedRoles;
-    }
     
-    function isAdmin() {
-      return hasRole(['admin']);
-    }
-
-    function isManagerOrAdmin() {
-      return hasRole(['admin', 'manager']);
-    }
-
-    function isStaff() {
-      return request.auth != null && request.auth.token.role in ['cashier', 'waiter', 'manager', 'admin'];
-    }
-    
+    // Helper functions
     function isAuthed() {
       return request.auth != null;
     }
-
-    // Public profile docs used by the login grid.
-    // DO NOT store pinHash or other secrets here.
-    match /users/{uid} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isManagerOrAdmin() && !('pinHash' in request.resource.data);
-      allow delete: if isAdmin();
+    function hasRole(roles) {
+      return request.auth != null && request.auth.token.role in roles;
+    }
+    function isStaff() {
+      return request.auth != null &&
+      request.auth.token.role in ['cashier', 'manager', 'admin'];
     }
 
-    // Secrets only. Client must never reach this.
-    match /userSecrets/{uid} {
-      allow read, write: if false;         // block client entirely
+    // Public read for login screen
+    match /users/{userId} {
+      allow get: if true;
+      allow list: if true;
+      allow write: if hasRole(['admin', 'manager']);
     }
 
-    // PRODUCTS
-    match /products/{id} {
-      allow read: if true;
-      allow create, update: if isManagerOrAdmin();
-      allow delete: if isAdmin();
+    // Server-side only
+    match /userSecrets/{userId} {
+      allow read, write: if false;
     }
 
-    // CATEGORIES
-    match /categories/{id} {
-      allow read: if true;
-      allow write: if isManagerOrAdmin();
+    // Products & Categories
+    match /products/{productId} {
+      allow read: if isAuthed();
+      allow write: if hasRole(['admin', 'manager']);
     }
-    
-    // Inventory ledger
+    match /categories/{categoryId} {
+      allow read: if isAuthed();
+      allow write: if hasRole(['admin', 'manager']);
+    }
+
+    // Inventory ledger is append-only by server
     match /inventory_ledger/{docId} {
       allow read: if isAuthed();
-      // Writes only via privileged roles through Cloud Functions
-      allow create: if isManagerOrAdmin();
-      allow update, delete: if false; // append-only
+      allow create: if hasRole(['admin', 'manager']);
+      allow update, delete: if false; 
     }
-    
-    // ORDERS & DAY SUMMARIES
+
+    // Settings (readable by staff, write via server only)
+    match /settings/general {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
+    // Orders (and subcollections) readable by staff, write by server only
     match /orders/{orderId} {
       allow read: if isStaff();
-      allow write: if false; // all writes via CF
+      allow write: if false;
 
       match /lines/{lineId} {
         allow read: if isStaff();
         allow write: if false;
       }
-
       match /payments/{paymentId} {
         allow read: if isStaff();
         allow write: if false;
       }
-    }
-    
-    match /day_summaries/{id} {
-      allow read: if isStaff();
-      allow write: if false; // CF only
     }
   }
 }
