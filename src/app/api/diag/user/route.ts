@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
     if (!uid) {
         const snap = await adminDb.collection('users').limit(1).get();
-        return NextResponse.json({ ok: true, usersCountHint: snap.size });
+        return NextResponse.json({ ok: true, usersCountHint: snap.size, message: "Provide a 'uid' query parameter to check a specific user." });
     }
     
     const userDoc = await adminDb.collection('users').doc(uid).get();
