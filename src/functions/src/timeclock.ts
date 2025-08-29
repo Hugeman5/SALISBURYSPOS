@@ -1,8 +1,8 @@
+
 import type {Role} from "./utils";
 
 
 import {onCall} from "firebase-functions/v2/https";
-// // import * as admin from "firebase-admin";
 import {Timestamp} from "firebase-admin/firestore";
 import {db, requireRole} from "./utils";
 
@@ -31,7 +31,7 @@ async function getLatestOpen(uid: string) {
 }
 
 /** Any signed-in staff may clock in/out */
-const STAFF_ROLES: Role[] = ["admin", "manager", "cashier"];
+const STAFF_ROLES: Role[] = ["admin", "manager", "cashier", "waiter", "kitchen"];
 
 export const clockIn = onCall({cors: true}, async (req) => {
   const role = requireRole(req, STAFF_ROLES);

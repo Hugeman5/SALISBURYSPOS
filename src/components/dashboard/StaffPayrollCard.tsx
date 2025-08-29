@@ -76,7 +76,7 @@ export default function StaffPayrollCard() {
       const rateByUid: Record<string, number> = {};
       await Promise.all(uids.map(async (u) => {
         try {
-          const pv = await getDoc(doc(db, 'users_private', u));
+          const pv = await getDoc(doc(db, 'userSecrets', u));
           const data = pv.exists() ? (pv.data() as PrivateRate) : undefined;
           rateByUid[u] = Math.max(0, Number(data?.hourlyRate ?? 0));
         } catch {
