@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Search, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { LogoutButton } from '@/components/auth/logout-button';
 
 export default function SalePage() {
   const profile = useAuth(s => s.profile);
@@ -100,6 +101,7 @@ export default function SalePage() {
                 Cash Management
               </Link>
             </Button>
+            <LogoutButton />
           </div>
           <ProductGrid products={filteredProducts} onAddToCart={handleAddToCart} loading={loading} />
         </div>
