@@ -1,236 +1,81 @@
 {
   "indexes": [
     {
-      "collectionGroup": "inventory_ledger",
+      "collectionGroup": "users",
       "queryScope": "COLLECTION",
       "fields": [
-        {
-          "fieldPath": "productId",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "ts",
-          "order": "DESCENDING",
-          "arrayConfig": null
-        }
+        { "fieldPath": "active", "order": "ASCENDING" },
+        { "fieldPath": "name",   "order": "ASCENDING" }
       ]
     },
     {
-      "collectionGroup": "inventory_ledger",
+      "collectionGroup": "users",
       "queryScope": "COLLECTION",
       "fields": [
-        {
-          "fieldPath": "ts",
-          "order": "DESCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "type",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        }
+        { "fieldPath": "active", "order": "ASCENDING" },
+        { "fieldPath": "role",   "order": "ASCENDING" },
+        { "fieldPath": "name",   "order": "ASCENDING" }
       ]
     },
+
+    {
+      "collectionGroup": "products",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "categoryId", "order": "ASCENDING" },
+        { "fieldPath": "active",     "order": "ASCENDING" },
+        { "fieldPath": "name",       "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "products",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "active", "order": "ASCENDING" },
+        { "fieldPath": "name",   "order": "ASCENDING" }
+      ]
+    },
+
     {
       "collectionGroup": "orders",
       "queryScope": "COLLECTION",
       "fields": [
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        }
+        { "fieldPath": "status",    "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
+
     {
-      "collectionGroup": "products",
+      "collectionGroup": "inventory_ledger",
       "queryScope": "COLLECTION",
       "fields": [
-        {
-          "fieldPath": "active",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "categoryId",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "name",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        }
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "ts",   "order": "DESCENDING" }
       ]
     },
     {
-      "collectionGroup": "products",
+      "collectionGroup": "inventory_ledger",
       "queryScope": "COLLECTION",
       "fields": [
-        {
-          "fieldPath": "active",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "name",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        }
+        { "fieldPath": "productId", "order": "ASCENDING" },
+        { "fieldPath": "ts",        "order": "DESCENDING" }
       ]
     },
+
     {
-      "collectionGroup": "sessions",
-      "queryScope": "COLLECTION_GROUP",
+      "collectionGroup": "time_clock",
+      "queryScope": "COLLECTION",
       "fields": [
-        {
-          "fieldPath": "inAt",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "outAt",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        }
+        { "fieldPath": "outAt", "order": "ASCENDING" },
+        { "fieldPath": "inAt",  "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "time_clock",
       "queryScope": "COLLECTION",
       "fields": [
-        {
-          "fieldPath": "inAt",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "outAt",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        }
-      ]
-    },
-    {
-      "collectionGroup": "time_clock",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "inAt",
-          "order": "DESCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "outAt",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        }
-      ]
-    },
-    {
-      "collectionGroup": "time_clock",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "inAt",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "outAt",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        }
-      ]
-    },
-    {
-      "collectionGroup": "time_clock",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "inAt",
-          "order": "DESCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "outAt",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        }
-      ]
-    },
-    {
-      "collectionGroup": "users",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "active",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "name",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        }
-      ]
-    },
-    {
-      "collectionGroup": "users",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "active",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "name",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "role",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        }
-      ]
-    },
-    {
-      "collectionGroup": "users",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "active",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "name",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        }
+        { "fieldPath": "outAt", "order": "ASCENDING" },
+        { "fieldPath": "inAt",  "order": "DESCENDING" }
       ]
     }
   ],
