@@ -1,91 +1,72 @@
-import {onCall, HttpsError, type CallableRequest} from "firebase-functions/v2/https";
+/**
+ * @fileoverview Cloud Functions for inventory and stock management.
+ */
+
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {format} from "date-fns";
+import {db, requireRole} from "./utils";
 
-// ---------- Admin initialization (safe across hot reloads) ----------
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-const db = admin.firestore();
-
-// ---------- Auth helpers ----------
-type Role = "admin" | "manager" | "cashier" | "waiter" | "kitchen";
-
-function requireRole(req: CallableRequest, allowed: Role[]) {
-  if (!req.auth) throw new HttpsError("unauthenticated", "Sign-in required.");
-  const role = (req.auth.token as any)?.role as Role | undefined;
-  if (!role || !allowed.includes(role)) {
-    throw new HttpsError("permission-denied", "Insufficient permissions.");
-  }
-  return role;
-}
-
-// ---------- Inventory types ----------
+/** Defines the types of stock movements allowed in the ledger. */
 type MovementType = "receive" | "sale" | "refund" | "wastage" | "adjust" | "set";
 
-// ===================================================================
-// Post a stock movement (receive/sale/refund/wastage/adjust/set)
-// ===================================================================
+/** Payload for the adminPostStockMovement function. */
+interface PostMovementPayload {
+  productId: string;
+  type: MovementType;
+  qty: number;
+  note?: string | null;
+  clientTxnId?: string | null;
+  adjustSign?: 1 | -1;
+}
+
+/**
+ * Posts a stock movement to the inventory ledger and updates the product's
+ * stock-on-hand count in a single transaction. Supports idempotency.
+ */
 export const adminPostStockMovement = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
-
-  const uid = req.auth!.uid;
-  const actorName =
-    (req.auth!.token as any)?.name ||
-    (req.auth!.token as any)?.email ||
-    uid;
-
-  const {
-    productId,
-    type,
-    qty,
-    note = null,
-    clientTxnId = null,
-    adjustSign = 1,
-  } = (req.data ?? {}) as {
-    productId?: string;
-    type?: MovementType | string;
-    qty?: number;
-    note?: string | null;
-    clientTxnId?: string | null;
-    adjustSign?: number;
-  };
-
-  // ---- Validation ----
-  if (!productId || typeof productId !== "string") {
-    throw new HttpsError("invalid-argument", "productId required (string).");
+  const uid = req.auth?.uid;
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "Authentication is required.");
   }
-  const validTypes: MovementType[] = ["receive", "sale", "refund", "wastage", "adjust", "set"];
-  if (!type || !validTypes.includes(type as MovementType)) {
+
+  const actorName = req.auth?.token?.name || req.auth?.token?.email || uid;
+  const data = req.data as PostMovementPayload;
+
+  // --- Validation ---
+  if (!data.productId) {
+    throw new HttpsError("invalid-argument", "productId is required.");
+  }
+  const validTypes: MovementType[] = [
+    "receive", "sale", "refund", "wastage", "adjust", "set",
+  ];
+  if (!validTypes.includes(data.type)) {
     throw new HttpsError("invalid-argument", "Invalid movement type.");
   }
-  if (typeof qty !== "number" || !Number.isInteger(qty) || qty < 0) {
+  if (typeof data.qty !== "number" || !Number.isInteger(data.qty) || data.qty < 0) {
     throw new HttpsError("invalid-argument", "qty must be a non-negative integer.");
   }
 
-  // ---- Idempotency: same clientTxnId + productId => return existing ----
-  if (clientTxnId) {
-    const dupQ = await db
-      .collection("inventory_ledger")
-      .where("clientTxnId", "==", clientTxnId)
-      .where("productId", "==", productId)
-      .limit(1)
-      .get();
-    if (!dupQ.empty) {
-      const existing = dupQ.docs[0].data();
-      return {ok: true, ...existing, duplicate: true};
+  // --- Idempotency Check ---
+  if (data.clientTxnId) {
+    const dupSnap = await db.collection("inventory_ledger")
+      .where("clientTxnId", "==", data.clientTxnId)
+      .where("productId", "==", data.productId)
+      .limit(1).get();
+    if (!dupSnap.empty) {
+      return {ok: true, ...dupSnap.docs[0].data(), duplicate: true};
     }
   }
 
-  const productRef = db.collection("products").doc(productId);
+  const productRef = db.collection("products").doc(data.productId);
   const ledgerRef = db.collection("inventory_ledger").doc();
 
-  // ---- Transaction: compute delta/after, update product, write ledger ----
+  // --- Transaction ---
   const {before, after, delta} = await db.runTransaction(async (tx) => {
     const snap = await tx.get(productRef);
     if (!snap.exists) throw new HttpsError("not-found", "Product not found.");
-    const product = snap.data()!;
-
+    const product = snap.data() || {};
     if (!product.trackStock) {
       throw new HttpsError("failed-precondition", "Product does not track stock.");
     }
@@ -93,143 +74,80 @@ export const adminPostStockMovement = onCall({cors: true}, async (req) => {
     const before = Number(product.stockOnHand || 0);
     let delta = 0;
     let after = before;
+    const qty = data.qty;
 
-    switch (type as MovementType) {
-    case "receive":
-    case "refund":
-      delta = qty;
-      after = before + delta;
-      break;
-    case "sale":
-    case "wastage":
-      delta = -qty;
-      after = before + delta;
-      break;
-    case "adjust": {
-      const s = adjustSign === -1 ? -1 : 1;
-      delta = qty * s;
-      after = before + delta;
-      break;
+    switch (data.type) {
+    case "receive": case "refund": delta = qty; break;
+    case "sale": case "wastage": delta = -qty; break;
+    case "adjust": delta = qty * (data.adjustSign === -1 ? -1 : 1); break;
+    case "set": after = qty; delta = after - before; break;
     }
-    case "set":
-      after = qty;
-      delta = after - before;
-      break;
-    }
+    if (data.type !== "set") after = before + delta;
+    if (after < 0) throw new HttpsError("failed-precondition", "Stock cannot go negative.");
 
-    if (after < 0) {
-      throw new HttpsError("failed-precondition", "Stock cannot be negative.");
-    }
-
-    const ledgerEntry = {
-      productId,
-      productSku: product.sku || "",
-      productName: product.name || "",
-      type,
-      qty,
-      delta,
-      before,
-      after,
-      note,
-      userId: uid,
-      userName: actorName,
-      ts: admin.firestore.FieldValue.serverTimestamp(),
-      clientTxnId,
-    };
-
-    tx.set(ledgerRef, ledgerEntry);
-    tx.update(productRef, {
-      stockOnHand: after,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    tx.set(ledgerRef, {
+      productId: data.productId, productName: product.name || "",
+      productSku: product.sku || "", type: data.type, qty, delta,
+      before, after, note: data.note || null, userId: uid, userName: actorName,
+      ts: admin.firestore.FieldValue.serverTimestamp(), clientTxnId: data.clientTxnId,
     });
-
+    tx.update(productRef, {
+      stockOnHand: after, updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
     return {before, after, delta};
   });
 
   return {ok: true, before, after, delta, ledgerId: ledgerRef.id};
 });
 
-// ===================================================================
-// Export inventory ledger to CSV (optionally filtered by product/type/ts)
-// Smart querying to avoid unnecessary composite index requirements.
-// ===================================================================
+/** Payload for the adminExportLedger function. */
+interface ExportLedgerPayload {
+  productId?: string;
+  type?: MovementType;
+  fromTs?: string | number;
+  toTs?: string | number;
+}
+
+/**
+ * Exports the inventory ledger to a CSV file, with optional filters.
+ */
 export const adminExportLedger = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
-
-  const {productId, type, fromTs, toTs} = (req.data ?? {}) as {
-    productId?: string;
-    type?: MovementType | string;
-    fromTs?: string | number | Date;
-    toTs?: string | number | Date;
-  };
-
-  // Build a base query and avoid forcing "productId + type + ts" all together.
-  // If BOTH productId and type are provided, we’ll query by productId + ts and filter type in-memory.
+  const data = req.data as ExportLedgerPayload;
+  const {productId, type, fromTs, toTs} = data;
   const rangeFrom = fromTs ? new Date(fromTs) : undefined;
   const rangeTo = toTs ? new Date(toTs) : undefined;
+  let q = db.collection("inventory_ledger").orderBy("ts", "desc");
 
-  const baseCol = db.collection("inventory_ledger");
-
-  let q:
-    | FirebaseFirestore.Query<FirebaseFirestore.DocumentData>
-    | FirebaseFirestore.CollectionReference<FirebaseFirestore.DocumentData> = baseCol;
-
-  // If both are provided, prefer productId + ts (usually the more selective),
-  // then filter by `type` after fetch to avoid requiring a triple composite index.
-  const willFilterTypeInMemory = Boolean(productId && type);
-
+  // To avoid needing a composite index, we only filter on one field + ts
+  const willFilterTypeInMemory = !!(productId && type);
   if (productId) q = q.where("productId", "==", productId);
-  else if (type) q = q.where("type", "==", type as MovementType);
-
-  // Order by ts desc and add range if provided (this requires a simple composite index for whichever equality is used).
-  q = q.orderBy("ts", "desc");
+  else if (type) q = q.where("type", "==", type);
   if (rangeFrom) q = q.where("ts", ">=", rangeFrom);
   if (rangeTo) q = q.where("ts", "<", rangeTo);
 
-  // Cap to something large but bounded
   const snap = await q.limit(50000).get();
-
-  const rows: string[] = [
+  const rows = [
     "ts,productId,productSku,productName,type,qty,delta,before,after,userId,userName,note,clientTxnId",
   ];
 
-  for (const d of snap.docs) {
-    const v = d.data() as any;
-
+  for (const doc of snap.docs) {
+    const v = doc.data();
     if (willFilterTypeInMemory && v.type !== type) continue;
-
-    const tsStr =
-      v.ts?.toDate?.() ? format(v.ts.toDate(), "yyyy-MM-dd'T'HH:mm:ssXXX") : "";
-
-    // Basic CSV escaping for strings
-    const esc = (s: string | null | undefined) =>
-      `"${String(s ?? "").replace(/"/g, "\"\"")}"`;
-
-    rows.push(
-      [
-        tsStr,
-        v.productId,
-        v.productSku || "",
-        esc(v.productName),
-        v.type,
-        v.qty,
-        v.delta,
-        v.before,
-        v.after,
-        v.userId,
-        esc(v.userName),
-        esc(v.note),
-        v.clientTxnId || "",
-      ].join(",")
-    );
+    const tsDate = v.ts?.toDate?.();
+    const tsStr = tsDate ? format(tsDate, "yyyy-MM-dd'T'HH:mm:ssXXX") : "";
+    const esc = (s: string|null|undefined) => `"${String(s??"").replace(/"/g, "\"\"")}"`;
+    rows.push([
+      tsStr, v.productId, v.productSku || "", esc(v.productName), v.type,
+      v.qty, v.delta, v.before, v.after, v.userId, esc(v.userName),
+      esc(v.note), v.clientTxnId || "",
+    ].join(","));
   }
 
   const csv = rows.join("\n");
   const dataBase64 = Buffer.from(csv).toString("base64");
-
   return {
     filename: `inventory-ledger-${format(new Date(), "yyyyMMdd-HHmm")}.csv`,
-    mime: "text/csv",
-    dataBase64,
+    mime: "text/csv", dataBase64,
   };
 });

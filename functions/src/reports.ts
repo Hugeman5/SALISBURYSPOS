@@ -1,161 +1,125 @@
+/**
+ * @fileoverview Cloud Functions for generating daily sales reports (Z-Reports).
+ */
 
-import {onCall} from "firebase-functions/v2/https";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {Timestamp} from "firebase-admin/firestore";
 import {db, requireRole} from "./utils";
 
 /**
- * Utility: SA day window (Africa/Johannesburg) for a given date string 'YYYY-MM-DD'
- * If startMs/endMs provided by client, those win.
+ * Creates a time window for a given date in the Africa/Johannesburg timezone.
+ * @param {string} [dateStr] - The date in 'YYYY-MM-DD' format. Defaults to today.
+ * @return {{startMs: number, endMs: number, key: string}} The time window.
  */
-function saDayWindow(dateStr?: string): { startMs: number; endMs: number; key: string } {
-  if (!dateStr) {
-    // Default: today in SA time
-    const saNowStr = new Date().toLocaleString("en-US", {timeZone: "Africa/Johannesburg"});
-    const saNow = new Date(saNowStr);
-    const y = saNow.getFullYear();
-    const m = saNow.getMonth();
-    const d = saNow.getDate();
-    const start = new Date(saNow); start.setHours(0, 0, 0, 0);
-    const end = new Date(saNow); end.setHours(24, 0, 0, 0);
-    const key = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    return {startMs: start.getTime(), endMs: end.getTime(), key};
+function saDayWindow(dateStr?: string) {
+  let y: number, m: number, d: number;
+
+  if (dateStr) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+    if (!match) throw new HttpsError("invalid-argument", "Date must be YYYY-MM-DD");
+    [y, m, d] = match.slice(1).map(Number);
+  } else {
+    const f = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Africa/Johannesburg",
+      year: "numeric", month: "2-digit", day: "2-digit",
+    });
+    const parts = f.formatToParts(new Date());
+    const p = (t: string) => Number(parts.find((pt) => pt.type === t)?.value);
+    y = p("year"); m = p("month"); d = p("day");
+    dateStr = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
   }
-  // Specific date in SA
-  const saMidnightStr = new Date(`${dateStr}T00:00:00`).toLocaleString("en-US", {timeZone: "Africa/Johannesburg"});
-  const start = new Date(saMidnightStr);
-  const end = new Date(saMidnightStr); end.setHours(24, 0, 0, 0);
-  return {startMs: start.getTime(), endMs: end.getTime(), key: dateStr};
+
+  const SA_OFFSET_MS = 2 * 60 * 60 * 1000;
+  const startMs = Date.UTC(y, m - 1, d) - SA_OFFSET_MS;
+  const endMs = Date.UTC(y, m - 1, d + 1) - SA_OFFSET_MS;
+  return {startMs, endMs, key: dateStr};
 }
 
 /**
- * Close the day (Z-Report): aggregates paid orders by SA day and writes z_closures/{YYYY-MM-DD}
- * Request data:
- *  - date?: string 'YYYY-MM-DD' in SA timezone (optional)
- *  - startMs?: number, endMs?: number (optional explicit range)
+ * Aggregates sales data for a given day to generate a Z-Report.
+ * This is idempotent; running it multiple times for the same day will
+ * overwrite the previous report with updated data.
  */
 export const adminCloseDay = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
 
-  const dateStr = typeof req.data?.date === "string" ? req.data.date : undefined;
-  const window = saDayWindow(dateStr);
-  const startMs = typeof req.data?.startMs === "number" ? req.data.startMs : window.startMs;
-  const endMs = typeof req.data?.endMs === "number" ? req.data.endMs : window.endMs;
-  const key = window.key;
+  const {date, startMs: startOverride, endMs: endOverride} =
+    req.data as {date?: string, startMs?: number, endMs?: number};
+  const window = saDayWindow(date);
+  const startMs = startOverride ?? window.startMs;
+  const endMs = endOverride ?? window.endMs;
 
-  const startTs = Timestamp.fromMillis(startMs);
-  const endTs = Timestamp.fromMillis(endMs);
-
-  // Query orders in the window (range only on 'ts' to avoid composite index requirements)
   const snap = await db.collection("orders")
-    .where("createdAt", ">=", startTs)
-    .where("createdAt", "<", endTs)
+    .where("createdAt", ">=", Timestamp.fromMillis(startMs))
+    .where("createdAt", "<", Timestamp.fromMillis(endMs))
     .get();
 
   const totals = {
-    countPaid: 0,
-    gross: 0,
-    vat: 0,
-    net: 0,
-    cash: 0,
-    card: 0,
-    other: 0,
-    discounts: 0,
-    returns: 0,
-    sampleSize: snap.size,
+    countPaid: 0, gross: 0, vat: 0, net: 0, cash: 0, card: 0,
+    other: 0, discounts: 0, returns: 0, sampleSize: snap.size,
   };
 
-  // Robust field reading (works with a few possible shapes)
   snap.forEach((doc) => {
-    const d: any = doc.data();
-    const status = d.status || d.state || "unknown";
-    if (status !== "paid") return;
-
-    const amounts = d.totals || d.amounts || d;
-    const gross = Number(amounts.gross ?? amounts.totalGross ?? amounts.totalInc ?? 0) || 0;
-    const vat = Number(amounts.vat ?? amounts.tax ?? 0) || 0;
-    const net = Number(amounts.net ?? (gross - vat)) || 0;
-
-    totals.countPaid += 1;
+    const d = doc.data();
+    if (d.status !== "paid") return;
+    const gross = Number(d.totals?.totalInc || 0);
+    totals.countPaid++;
     totals.gross += gross;
-    totals.vat += vat;
-    totals.net += net;
+    totals.vat += Number(d.totals?.vat || 0);
+    totals.net += Number(d.totals?.subTotalEx || 0);
+    totals.discounts += Number(d.discounts?.total || 0);
+    if (d.isReturn) totals.returns += gross;
 
-    // payments: array or single
-    const payments = Array.isArray(d.payments) ? d.payments : d.payment ? [d.payment] : [];
-    if (payments.length === 0) {
-      totals.other += gross;
-    } else {
-      for (const p of payments) {
-        const method = (p.method || p.type || "other").toLowerCase();
-        const amt = Number(p.amount ?? 0) || 0;
-        if (method.includes("cash")) totals.cash += amt;
-        else if (method.includes("card") || method.includes("pos")) totals.card += amt;
-        else totals.other += amt;
-      }
-    }
+    (d.payments || []).forEach((p: {type: string, amount: number}) => {
+      if (p.type === "cash") totals.cash += p.amount;
+      else if (p.type === "card") totals.card += p.amount;
+      else totals.other += p.amount;
+    });
+  });
 
-    // optional
-    const disc = Number(d.discounts?.total ?? d.discount ?? 0) || 0;
-    totals.discounts += disc;
-    if (d.isReturn || d.type === "return") {
-      totals.returns += gross;
+  // Round all monetary values to the nearest cent
+  Object.keys(totals).forEach((k) => {
+    if (k !== "countPaid" && k !== "sampleSize") {
+      (totals as any)[k] = Math.round((totals as any)[k]);
     }
   });
 
-  // Round to cents
-  for (const k of ["gross", "vat", "net", "cash", "card", "other", "discounts", "returns"] as const) {
-    // @ts-ignore
-    totals[k] = Math.round(totals[k]);
-  }
-
-  const docRef = db.collection("z_closures").doc(key);
-  await docRef.set({
-    key,
-    range: {startMs, endMs},
-    totals,
-    vatRate: 0.15,
-    currency: "ZAR",
-    closedAt: admin.firestore.FieldValue.serverTimestamp(),
-    closedByUid: req.auth?.uid || null,
+  await db.collection("z_closures").doc(window.key).set({
+    key: window.key, range: {startMs, endMs}, totals, vatRate: 0.15,
+    currency: "ZAR", closedAt: admin.firestore.FieldValue.serverTimestamp(),
+    closedByUid: uid,
   }, {merge: true});
 
-  return {ok: true, key, totals};
+  return {ok: true, key: window.key, totals};
 });
 
+
 /**
- * Export Z-Report as CSV. Reads z_closures/{dateKey}.
- * Request data:
- *  - date: 'YYYY-MM-DD' (required if you don't pass start/end)
+ * Exports a previously generated Z-Report to a CSV string.
  */
 export const adminExportZCsv = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
-  const date = String(req.data?.date || "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    throw new Error("date (YYYY-MM-DD) is required");
+  const {date} = req.data as {date?: string};
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new HttpsError("invalid-argument", "Date 'YYYY-MM-DD' is required.");
   }
   const doc = await db.collection("z_closures").doc(date).get();
-  if (!doc.exists) return {ok: false, error: "No Z-Report for that date."};
-  const d: any = doc.data();
+  if (!doc.exists) throw new HttpsError("not-found", "No report for that date.");
 
-  // Very small CSV (one row of totals + header)
-  const lines = [
-    ["date", "countPaid", "gross_cents", "vat_cents", "net_cents", "cash_cents", "card_cents", "other_cents", "discounts_cents", "returns_cents", "currency", "vatRate"],
-    [
-      date,
-      d.totals?.countPaid ?? 0,
-      d.totals?.gross ?? 0,
-      d.totals?.vat ?? 0,
-      d.totals?.net ?? 0,
-      d.totals?.cash ?? 0,
-      d.totals?.card ?? 0,
-      d.totals?.other ?? 0,
-      d.totals?.discounts ?? 0,
-      d.totals?.returns ?? 0,
-      d.currency ?? "ZAR",
-      d.vatRate ?? 0.15,
-    ],
+  const d = doc.data() || {};
+  const t = d.totals || {};
+  const header = [
+    "date", "countPaid", "gross_cents", "vat_cents", "net_cents",
+    "cash_cents", "card_cents", "other_cents", "discounts_cents", "returns_cents",
   ];
-  const csv = lines.map((r) => r.map((x) => String(x)).join(",")).join("\n");
+  const row = [
+    date, t.countPaid, t.gross, t.vat, t.net, t.cash, t.card, t.other,
+    t.discounts, t.returns,
+  ].map((v) => v ?? 0);
+
+  const csv = [header.join(","), row.join(",")].join("\n");
   return {ok: true, filename: `z_${date}.csv`, csv};
 });

@@ -1,47 +1,50 @@
+/**
+ * @fileoverview Main entry point for all Firebase Cloud Functions.
+ * This file exports all the callable functions, making them available to clients.
+ */
 
-import * as admin from "firebase-admin";
-
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
-// Products
+// Products and Inventory Management
 export {
   adminUpsertProduct,
   adminDeleteProduct,
   adminExportProducts,
   adminBulkImportProducts,
 } from "./products";
+export {
+  adminPostStockMovement,
+  adminExportLedger,
+} from "./inventory";
 
-// Users
+// User and Authentication Management
 export {
   adminUpsertUser,
   adminDeleteUser,
   adminSetUserPin,
 } from "./users";
 
-// Inventory
-export {
-  adminPostStockMovement,
-  adminExportLedger,
-} from "./inventory";
-
-// Orders
+// Order Processing
 export {
   cashierCreateOrder,
   cashierSetItems,
   cashierTakePayment,
   cashierCloseOrder,
-  getSalesSummary,
-  adminExportOrders,
 } from "./orders";
 
-// Reports
-export {adminCloseDay, adminExportZCsv} from "./reports";
+// Reporting
+export {
+  adminCloseDay,
+  adminExportZCsv,
+} from "./reports";
 
-// Timeclock
-export {clockIn, clockOut, adminExportTimeCsv} from "./timeclock";
+// Employee Time Clock
+export {
+  clockIn,
+  clockOut,
+  adminExportTimeCsv,
+} from "./timeclock";
 
-// Cash Register
-export {manageRegisterSession, postCashMovement} from "./cash-register";
-
+// Cash Register Management
+export {
+  manageRegisterSession,
+  postCashMovement,
+} from "./cash-register";

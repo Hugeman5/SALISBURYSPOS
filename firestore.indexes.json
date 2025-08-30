@@ -17,7 +17,6 @@
         { "fieldPath": "name",   "order": "ASCENDING" }
       ]
     },
-
     {
       "collectionGroup": "products",
       "queryScope": "COLLECTION",
@@ -35,7 +34,6 @@
         { "fieldPath": "name",   "order": "ASCENDING" }
       ]
     },
-
     {
       "collectionGroup": "orders",
       "queryScope": "COLLECTION",
@@ -52,7 +50,6 @@
         { "fieldPath": "closedAt", "order": "DESCENDING" }
       ]
     },
-
     {
       "collectionGroup": "inventory_ledger",
       "queryScope": "COLLECTION",
@@ -69,7 +66,6 @@
         { "fieldPath": "ts",        "order": "DESCENDING" }
       ]
     },
-
     {
       "collectionGroup": "time_clock",
       "queryScope": "COLLECTION",
