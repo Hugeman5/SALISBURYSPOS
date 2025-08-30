@@ -1,9 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    // Allow Firebase Studio proxy origin in dev (Cloud Workstations).
-    allowedDevOrigins: ['https://*.cloudworkstations.dev'],
+    // (intentionally empty for Next 14.x)
   },
-  reactStrictMode: true,
 };
+
 export default nextConfig;
