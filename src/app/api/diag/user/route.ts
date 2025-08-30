@@ -1,4 +1,3 @@
-
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +15,7 @@ export async function GET(req: NextRequest) {
     }
     
     const userDoc = await adminDb.collection('users').doc(uid).get();
-    const secretDoc = await adminDb.collection('userSecrets').doc(uid).get();
+    const secretDoc = await adminDb.collection('user_secrets').doc(uid).get();
 
     const user = userDoc.exists ? userDoc.data() : null;
     const secret = secretDoc.exists ? secretDoc.data() : null;

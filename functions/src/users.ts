@@ -19,7 +19,7 @@ type UpsertUserPayload = {
 export const adminUpsertUser = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
   const data = req.data as UpsertUserPayload;
-  
+
   const uid = data.id;
   if (!uid) {
     throw new Error("id is required");
@@ -56,9 +56,9 @@ export const adminUpsertUser = onCall({cors: true}, async (req) => {
     userDoc.createdAt = admin.firestore.FieldValue.serverTimestamp();
   }
 
-  await userRef.set(userDoc, { merge: true });
-  
-  return {ok: true, uid };
+  await userRef.set(userDoc, {merge: true});
+
+  return {ok: true, uid};
 });
 
 
@@ -69,10 +69,10 @@ export const adminSetUserPin = onCall({cors: true}, async (req) => {
   if (!uid || typeof uid !== "string") {
     throw new Error("uid is required");
   }
-  
+
   const updates: any = {};
   const secretUpdates: any = {
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   };
 
   if (pin) {
@@ -90,14 +90,14 @@ export const adminSetUserPin = onCall({cors: true}, async (req) => {
   }
 
   const batch = db.batch();
-  
+
   if (Object.keys(updates).length > 0) {
     updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
-    batch.set(db.collection("users").doc(uid), updates, { merge: true });
+    batch.set(db.collection("users").doc(uid), updates, {merge: true});
   }
 
   if (Object.keys(secretUpdates).length > 1) { // more than just timestamp
-    batch.set(db.collection("userSecrets").doc(uid), secretUpdates, { merge: true });
+    batch.set(db.collection("userSecrets").doc(uid), secretUpdates, {merge: true});
   }
 
   await batch.commit();

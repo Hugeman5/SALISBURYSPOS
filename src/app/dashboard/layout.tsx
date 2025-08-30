@@ -1,20 +1,26 @@
-
 'use client';
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/stores/auth-store';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { attachAuthListenerOnce } from '@/stores/auth-store';
 
 function DashboardGuard({ children }: { children: ReactNode }) {
-  const { profile, hydrated } = useAuth();
+  const [ready, setReady] = useState(false);
   const router = useRouter();
+  
+  attachAuthListenerOnce();
 
   useEffect(() => {
-    if (hydrated && !profile) {
-      router.replace('/login');
-    }
-  }, [hydrated, profile, router]);
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (!u) router.replace('/login');
+      else setReady(true);
+    });
+    return () => unsub();
+  }, [router]);
 
-  if (!hydrated || !profile) {
+
+  if (!ready) {
     return (
         <div className="flex h-screen items-center justify-center text-muted-foreground">
             Checking session…

@@ -1,11 +1,9 @@
-
 'use client';
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { signInWithCustomToken, signOut, onAuthStateChanged, type User as FbUser } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { auth } from '@/lib/firebase';
 
 type Role = 'admin'|'manager'|'cashier'|'waiter'|'kitchen';
 
@@ -20,14 +18,11 @@ type AuthState = {
   profile: Profile | null;
   role: Role | null;
   loading: boolean;
-  hydrated: boolean;
-  signingOut: boolean;
+  lastError: string | null;
   loginWithPin: (idOrUid: string, pin: string) => Promise<boolean>;
   logout: () => Promise<void>;
   setFromFirebase: (fb: FbUser | null) => void;
 };
-
-let controller: AbortController | null = null;
 
 export const useAuth = create<AuthState>()(
   persist(
@@ -35,41 +30,34 @@ export const useAuth = create<AuthState>()(
       profile: null,
       role: null,
       loading: false,
-      hydrated: false,
-      signingOut: false,
+      lastError: null,
 
       async loginWithPin(idOrUid: string, pin: string) {
-        if (get().loading) return false;
-        set({ loading: true });
-        try { controller?.abort(); } catch {}
-        controller = new AbortController();
+        if (get().loading) return false; // prevent concurrent requests
+        set({ loading: true, lastError: null });
 
         try {
           const res = await fetch('/api/auth/pin-login', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ uid: idOrUid, pin }),
-            signal: controller.signal,
+            body: JSON.stringify({ id: idOrUid, pin })
           });
-      
+
           if (!res.ok) {
             let msg = `${res.status}`;
             try { const j = await res.json(); msg = j.error || msg; } catch {}
+            set({ lastError: msg });
             console.error('PIN login failed:', msg);
             return false;
           }
-      
-          const { token } = await res.json(); 
-          const cred = await signInWithCustomToken(auth, token);
-      
-          await cred.user.getIdTokenResult(true);
 
+          const { token, role } = await res.json();
+          await signInWithCustomToken(auth, token);
+          set({ role: (role as Role) || 'cashier' });
           return true;
-        } catch (e: any) {
-           if (e.name === 'AbortError') {
-             console.log('PIN login fetch aborted.');
-             return false;
-           }
+        } catch (e) {
+          const msg = String((e as any)?.message ?? e);
+          set({ lastError: msg });
           console.error('loginWithPin error:', e);
           return false;
         } finally {
@@ -78,14 +66,10 @@ export const useAuth = create<AuthState>()(
       },
 
       async logout() {
-        if (get().signingOut) return;
-        set({ signingOut: true });
         try {
           await signOut(auth);
-        } catch (e) {
-          console.error('logout error:', e);
         } finally {
-          set({ profile: null, role: null, signingOut: false });
+          set({ profile: null, role: null });
         }
       },
 
@@ -97,32 +81,22 @@ export const useAuth = create<AuthState>()(
 
         const idTokenResult = await fb.getIdTokenResult(true);
         const roleClaim = (idTokenResult.claims.role as Role) || null;
-        set({ role: roleClaim });
         
-        const userRef = doc(db, 'users', fb.uid);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-            const userData = userSnap.data();
-            set({
-                profile: {
-                    id: fb.uid,
-                    name: userData.name || fb.displayName || 'User',
-                    role: (roleClaim || userData.role || 'cashier') as Role,
-                    active: userData.active ?? false,
-                }
-            })
-        } else {
-            set({ profile: { id: fb.uid, name: fb.displayName || 'User', role: (roleClaim || 'cashier') as Role, active: true } });
-        }
+        set({
+            role: roleClaim,
+            profile: {
+                id: fb.uid,
+                name: fb.displayName || 'User',
+                role: (roleClaim || 'cashier') as Role,
+                active: true, // If they have a token, they must have been active at login
+            }
+        });
       }
     }),
     {
       name: 'salisburyspos-auth',
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ profile: s.profile, role: s.role }),
-      onRehydrateStorage: () => (state) => {
-        if (state) state.hydrated = false;
-      }
+      partialize: (s) => ({ profile: s.profile, role: s.role })
     }
   )
 );
@@ -132,9 +106,6 @@ export function attachAuthListenerOnce() {
   if (typeof window === 'undefined' || authListenerAttached) return;
   authListenerAttached = true;
   
-  onAuthStateChanged(auth, async (user) => {
-    const { setFromFirebase } = useAuth.getState();
-    await setFromFirebase(user);
-    useAuth.setState({ hydrated: true });
-  });
+  const { setFromFirebase } = useAuth.getState();
+  onAuthStateChanged(auth, (user) => setFromFirebase(user));
 }

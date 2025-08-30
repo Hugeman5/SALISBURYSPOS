@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -8,7 +7,7 @@ import { Button } from '../ui/button';
 
 export function LogoutButton({ className = '' }: { className?: string }) {
   const router = useRouter();
-  const { logout, signingOut } = useAuth();
+  const { logout } = useAuth();
 
   const handle = async () => {
     await logout();
@@ -19,7 +18,6 @@ export function LogoutButton({ className = '' }: { className?: string }) {
     <Button
       variant="outline"
       onClick={handle}
-      disabled={signingOut}
       className={className}
       title="Sign out"
     >

@@ -1,4 +1,3 @@
-
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +16,6 @@ async function ensureAuthUser(uid: string, displayName?: string) {
 async function resolveUid(uid?: string, id?: string): Promise<string | null> {
     if (uid) return uid;
     if (id) {
-        // First, check if the id is a direct UID
         const userById = await adminDb.collection('users').doc(id).get();
         if (userById.exists) return id;
     }
@@ -38,7 +36,7 @@ export async function POST(req: Request) {
     }
 
     const userRef = adminDb.collection('users').doc(uid);
-    const secretRef = adminDb.collection('userSecrets').doc(uid);
+    const secretRef = adminDb.collection('user_secrets').doc(uid);
     const [userSnap, secretSnap] = await Promise.all([userRef.get(), secretRef.get()]);
 
     if (!userSnap.exists) {
