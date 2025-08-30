@@ -32,7 +32,7 @@ function toExCents(incCents: number, taxRate: number): number {
 /**
  * Finds a category by its lowercase name or creates it if it doesn't exist.
  * @param {string | null | undefined} name The category name.
- * @return {Promise<{id: string | null, name: string | null}>} The category ID and name.
+ * @return {Promise<{id: string | null, name: string | null}>} The category ID.
  */
 async function getOrCreateCategoryByName(name?: string | null) {
   if (!name) return {id: null as string | null, name: null as string | null};
@@ -97,7 +97,8 @@ async function upsertProductCore(input: UpsertInput) {
   const costIncCents = (costInc === null || costInc === "") ?
     null : centsFromZarString(costInc);
 
-  const {id: categoryId, name: catName} = await getOrCreateCategoryByName(categoryName);
+  const {id: categoryId, name: catName} =
+    await getOrCreateCategoryByName(categoryName);
 
   const conflicts = await db.collection("products")
     .where("skuUpper", "==", skuUpper).get();
@@ -153,7 +154,8 @@ export const adminExportProducts = onCall({cors: true}, async (req) => {
     const priceInc = (p.price?.incCents ?? 0) / 100;
     const cost = p.costIncCents === null || p.costIncCents === undefined ?
       "" : (Number(p.costIncCents) / 100).toFixed(2);
-    const esc = (s: string|null|undefined) => `"${String(s??"").replace(/"/g, "\"\"")}"`;
+    const esc = (s: string|null|undefined) =>
+      `"${String(s??"").replace(/"/g, "\"\"")}"`;
     rows.push([
       doc.id, esc(p.name), p.sku??"", p.barcode??"", esc(p.categoryName),
       String(!!p.trackStock), priceInc.toFixed(2), cost,
@@ -176,7 +178,9 @@ export const adminBulkImportProducts = onCall({cors: true}, async (req) => {
   const head = header.split(",").map((s) => s.trim().toLowerCase());
   const idx = (k: string) => head.indexOf(k);
 
-  const iName = idx("name"); const iSku = idx("sku"); const iInc = idx("priceinczar");
+  const iName = idx("name");
+  const iSku = idx("sku");
+  const iInc = idx("priceinczar");
   if (iName<0 || iSku<0 || iInc<0) {
     throw new HttpsError("invalid-argument", "CSV needs name,sku,priceIncZAR");
   }

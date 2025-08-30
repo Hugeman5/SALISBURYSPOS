@@ -20,9 +20,11 @@ export const manageRegisterSession = onCall({cors: true}, async (req) => {
 
   if (action === "open") {
     const {registerId, openingFloat} = req.data as {
-      registerId?: string; openingFloat?: number;
+      registerId?: string;
+      openingFloat?: number;
     };
-    if (!registerId || typeof openingFloat !== "number" || isNaN(openingFloat)) {
+    if (!registerId || typeof openingFloat !== "number" ||
+        isNaN(openingFloat)) {
       throw new HttpsError(
         "invalid-argument", "Register ID and opening float are required."
       );
@@ -49,7 +51,8 @@ export const manageRegisterSession = onCall({cors: true}, async (req) => {
 
   if (action === "close") {
     const {sessionId, countedCash} = req.data as {
-      sessionId?: string; countedCash?: number;
+      sessionId?: string;
+      countedCash?: number;
     };
     if (!sessionId || typeof countedCash !== "number" || isNaN(countedCash)) {
       throw new HttpsError(
@@ -58,7 +61,9 @@ export const manageRegisterSession = onCall({cors: true}, async (req) => {
     }
     const sessionRef = db.collection("register_sessions").doc(sessionId);
     const sessionSnap = await sessionRef.get();
-    if (!sessionSnap.exists) throw new HttpsError("not-found", "Session not found.");
+    if (!sessionSnap.exists) {
+      throw new HttpsError("not-found", "Session not found.");
+    }
     const session = sessionSnap.data() || {};
     if (session.status !== "open") {
       throw new HttpsError("failed-precondition", "Session is not open.");
@@ -89,8 +94,10 @@ export const postCashMovement = onCall({cors: true}, async (req) => {
 
   const actorName = req.auth?.token?.name || req.auth?.token?.email || uid;
   const {sessionId, type, amount, reason} = req.data as {
-    sessionId?: string; type?: "payin" | "payout";
-    amount?: number; reason?: string;
+    sessionId?: string;
+    type?: "payin" | "payout";
+    amount?: number;
+    reason?: string;
   };
 
   if (!sessionId || !type || typeof amount !== "number" || !reason) {

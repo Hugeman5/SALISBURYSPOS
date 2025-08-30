@@ -17,7 +17,9 @@ function saDayWindow(dateStr?: string) {
 
   if (dateStr) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
-    if (!match) throw new HttpsError("invalid-argument", "Date must be YYYY-MM-DD");
+    if (!match) {
+      throw new HttpsError("invalid-argument", "Date must be YYYY-MM-DD");
+    }
     [y, m, d] = match.slice(1).map(Number);
   } else {
     const f = new Intl.DateTimeFormat("en-CA", {
@@ -107,13 +109,16 @@ export const adminExportZCsv = onCall({cors: true}, async (req) => {
     throw new HttpsError("invalid-argument", "Date 'YYYY-MM-DD' is required.");
   }
   const doc = await db.collection("z_closures").doc(date).get();
-  if (!doc.exists) throw new HttpsError("not-found", "No report for that date.");
+  if (!doc.exists) {
+    throw new HttpsError("not-found", "No report for that date.");
+  }
 
   const d = doc.data() || {};
   const t = d.totals || {};
   const header = [
     "date", "countPaid", "gross_cents", "vat_cents", "net_cents",
-    "cash_cents", "card_cents", "other_cents", "discounts_cents", "returns_cents",
+    "cash_cents", "card_cents", "other_cents", "discounts_cents",
+    "returns_cents",
   ];
   const row = [
     date, t.countPaid, t.gross, t.vat, t.net, t.cash, t.card, t.other,

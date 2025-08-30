@@ -24,17 +24,21 @@ function splitVat(inclCents: number) {
 const createOrderSchema = z.object({note: z.string().optional()});
 const setItemsSchema = z.object({
   orderId: z.string(),
-  items: z.array(z.object({productId: z.string(), qty: z.number().int().gt(0)})).min(1),
+  items: z.array(
+    z.object({productId: z.string(), qty: z.number().int().gt(0)})
+  ).min(1),
 });
 const takePaymentSchema = z.object({
-  orderId: z.string(), type: z.enum(["cash", "card"]), amount: z.number().int().gt(0),
+  orderId: z.string(),
+  type: z.enum(["cash", "card"]),
+  amount: z.number().int().gt(0),
 });
 const closeOrderSchema = z.object({orderId: z.string()});
 
 /**
  * Fetches product details for a list of product IDs.
  * @param {string[]} ids - An array of product IDs.
- * @return {Promise<Map<string, FirebaseFirestore.DocumentData>>} A map of product data.
+ * @return {Promise<Map<string, FirebaseFirestore.DocumentData>>} A map of data.
  */
 async function getProductsByIds(ids: string[]) {
   const chunks: string[][] = [];
@@ -78,11 +82,14 @@ export const cashierSetItems = onCall({cors: true}, async (req) => {
   let subEx=0; let vat=0; let inc=0;
   const orderItems = cartItems.map((ci) => {
     const p = productsById.get(ci.productId);
-    if (!p) throw new HttpsError("not-found", `Product ${ci.productId} not found`);
+    if (!p) {
+      throw new HttpsError("not-found", `Product ${ci.productId} not found`);
+    }
     const priceInc = Number(p.price?.incCents);
     const vatRate = Number(p.price?.taxRate ?? VAT_RATE);
     if (!Number.isFinite(priceInc) || priceInc<0) {
-      throw new HttpsError("failed-precondition", `Invalid price for ${ci.productId}`);
+      const msg = `Invalid price for ${ci.productId}`;
+      throw new HttpsError("failed-precondition", msg);
     }
     const lineInc = priceInc * ci.qty;
     const {excl: lineEx, vat: lineVat} = splitVat(lineInc);
@@ -105,7 +112,9 @@ export const cashierSetItems = onCall({cors: true}, async (req) => {
 export const cashierTakePayment = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager", "cashier"]);
   const {orderId, type, amount} = takePaymentSchema.parse(req.data);
-  const payment = {type, amount, ts: admin.firestore.FieldValue.serverTimestamp()};
+  const payment = {
+    type, amount, ts: admin.firestore.FieldValue.serverTimestamp(),
+  };
   await db.collection("orders").doc(orderId)
     .update({payments: admin.firestore.FieldValue.arrayUnion(payment)});
   return {ok: true};
@@ -154,7 +163,10 @@ export const cashierCloseOrder = onCall({cors: true}, async (req) => {
         userName: req.auth?.token?.name || req.auth?.token?.email || uid,
         ts: admin.firestore.FieldValue.serverTimestamp(),
       });
-      tx.update(pRef, {stockOnHand: after, updatedAt: admin.firestore.FieldValue.serverTimestamp()});
+      tx.update(pRef, {
+        stockOnHand: after,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
     }
 
     tx.update(orderRef, {

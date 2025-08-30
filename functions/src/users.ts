@@ -23,8 +23,8 @@ interface UpsertUserPayload {
 /**
  * A callable function for admins/managers to create or update a user profile.
  * It handles validation and ensures role permissions.
- * @param {object} data The data passed to the function.
- * @param {UpsertUserPayload} data The user data.
+ * @param {object} req The request object.
+ * @param {UpsertUserPayload} req.data The user data.
  * @return {Promise<{ok: true, id: string}>} A promise that resolves on success.
  */
 export const adminUpsertUser = onCall({cors: true}, async (req) => {
@@ -91,9 +91,9 @@ export const adminUpsertUser = onCall({cors: true}, async (req) => {
 
 /**
  * A callable function for admins to permanently delete a user account.
- * This removes the user profile, their secret (PIN), and their auth record.
- * @param {object} data The data passed to the function.
- * @param {string} data.id The ID of the user to delete.
+ * This removes user profile, their secret (PIN), and their auth record.
+ * @param {object} req The request object.
+ * @param {string} req.data.id The ID of the user to delete.
  * @return {Promise<{ok: true, id: string}>} A promise that resolves on success.
  */
 export const adminDeleteUser = onCall({cors: true}, async (req) => {
@@ -124,9 +124,9 @@ export const adminDeleteUser = onCall({cors: true}, async (req) => {
 /**
  * A callable function for admins/managers to set a user's 4-digit PIN.
  * The PIN is hashed before being stored in a secure client-inaccessible doc.
- * @param {object} data The data passed to the function.
- * @param {string} data.id The user's ID.
- * @param {string} data.pin The user's 4-digit PIN.
+ * @param {object} req The request object.
+ * @param {string} req.data.id The user's ID.
+ * @param {string} req.data.pin The user's 4-digit PIN.
  * @return {Promise<{ok: true}>} A promise that resolves on success.
  */
 export const adminSetUserPin = onCall({cors: true}, async (req) => {

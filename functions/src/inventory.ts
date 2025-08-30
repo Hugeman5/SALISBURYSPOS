@@ -8,7 +8,8 @@ import {format} from "date-fns";
 import {db, requireRole} from "./utils";
 
 /** Defines the types of stock movements allowed in the ledger. */
-type MovementType = "receive" | "sale" | "refund" | "wastage" | "adjust" | "set";
+type MovementType = "receive" | "sale" | "refund" | "wastage" |
+                    "adjust" | "set";
 
 /** Payload for the adminPostStockMovement function. */
 interface PostMovementPayload {
@@ -44,8 +45,10 @@ export const adminPostStockMovement = onCall({cors: true}, async (req) => {
   if (!validTypes.includes(data.type)) {
     throw new HttpsError("invalid-argument", "Invalid movement type.");
   }
-  if (typeof data.qty !== "number" || !Number.isInteger(data.qty) || data.qty < 0) {
-    throw new HttpsError("invalid-argument", "qty must be a non-negative integer.");
+  if (typeof data.qty !== "number" || !Number.isInteger(data.qty) ||
+      data.qty < 0) {
+    const msg = "qty must be a non-negative integer.";
+    throw new HttpsError("invalid-argument", msg);
   }
 
   // --- Idempotency Check ---
@@ -68,7 +71,8 @@ export const adminPostStockMovement = onCall({cors: true}, async (req) => {
     if (!snap.exists) throw new HttpsError("not-found", "Product not found.");
     const product = snap.data() || {};
     if (!product.trackStock) {
-      throw new HttpsError("failed-precondition", "Product does not track stock.");
+      const msg = "Product does not track stock.";
+      throw new HttpsError("failed-precondition", msg);
     }
 
     const before = Number(product.stockOnHand || 0);
@@ -83,16 +87,20 @@ export const adminPostStockMovement = onCall({cors: true}, async (req) => {
     case "set": after = qty; delta = after - before; break;
     }
     if (data.type !== "set") after = before + delta;
-    if (after < 0) throw new HttpsError("failed-precondition", "Stock cannot go negative.");
+    if (after < 0) {
+      throw new HttpsError("failed-precondition", "Stock cannot go negative.");
+    }
 
     tx.set(ledgerRef, {
       productId: data.productId, productName: product.name || "",
       productSku: product.sku || "", type: data.type, qty, delta,
       before, after, note: data.note || null, userId: uid, userName: actorName,
-      ts: admin.firestore.FieldValue.serverTimestamp(), clientTxnId: data.clientTxnId,
+      ts: admin.firestore.FieldValue.serverTimestamp(),
+      clientTxnId: data.clientTxnId,
     });
     tx.update(productRef, {
-      stockOnHand: after, updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      stockOnHand: after,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
     return {before, after, delta};
   });
@@ -128,7 +136,8 @@ export const adminExportLedger = onCall({cors: true}, async (req) => {
 
   const snap = await q.limit(50000).get();
   const rows = [
-    "ts,productId,productSku,productName,type,qty,delta,before,after,userId,userName,note,clientTxnId",
+    "ts,productId,productSku,productName,type,qty,delta,before,after," +
+    "userId,userName,note,clientTxnId",
   ];
 
   for (const doc of snap.docs) {
@@ -136,7 +145,8 @@ export const adminExportLedger = onCall({cors: true}, async (req) => {
     if (willFilterTypeInMemory && v.type !== type) continue;
     const tsDate = v.ts?.toDate?.();
     const tsStr = tsDate ? format(tsDate, "yyyy-MM-dd'T'HH:mm:ssXXX") : "";
-    const esc = (s: string|null|undefined) => `"${String(s??"").replace(/"/g, "\"\"")}"`;
+    const esc = (s: string|null|undefined) =>
+      `"${String(s??"").replace(/"/g, "\"\"")}"`;
     rows.push([
       tsStr, v.productId, v.productSku || "", esc(v.productName), v.type,
       v.qty, v.delta, v.before, v.after, v.userId, esc(v.userName),

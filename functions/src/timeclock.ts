@@ -103,7 +103,8 @@ export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
   const {startMs, endMs} = req.data as {startMs?: number, endMs?: number};
   if (!startMs || !endMs || endMs <= startMs) {
-    throw new HttpsError("invalid-argument", "Valid startMs and endMs are required.");
+    const msg = "Valid startMs and endMs are required.";
+    throw new HttpsError("invalid-argument", msg);
   }
 
   const snap = await db.collectionGroup("sessions")
@@ -122,7 +123,8 @@ export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
     const s = doc.data();
     const inMs = (s.inAt as Timestamp).toMillis();
     const outMs = s.outAt ? (s.outAt as Timestamp).toMillis() : null;
-    const dur = s.durationSec ?? (outMs ? Math.max(0, (outMs-inMs)/1000) : 0);
+    const dur = s.durationSec ?? (outMs ?
+      Math.max(0, (outMs-inMs)/1000) : 0);
     rows.push({
       uid: s.uid, userName: s.userName || "", inAt: inMs, outAt: outMs,
       durationSec: dur, costCents: s.costCents || 0,
@@ -132,7 +134,9 @@ export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
     byUser[s.uid].totalCost += s.costCents || 0;
   });
 
-  const header = ["uid", "userName", "inAtISO", "outAtISO", "durationHours", "costZAR"];
+  const header = [
+    "uid", "userName", "inAtISO", "outAtISO", "durationHours", "costZAR",
+  ];
   const det = rows.map((r) => [
     r.uid, `"${r.userName}"`, new Date(r.inAt).toISOString(),
     r.outAt ? new Date(r.outAt).toISOString() : "",
