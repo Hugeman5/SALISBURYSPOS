@@ -1,79 +1,66 @@
+// src/app/api/auth/pin-login/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import { getAdminDb, getAdminAuth } from "@/lib/server/firebaseAdmin";
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+type Role = "admin" | "manager" | "cashier" | "waiter" | "kitchen";
 
-import { NextResponse } from 'next/server';
-import { adminAuth, adminDb } from '@/lib/firebase-admin';
-import bcrypt from 'bcryptjs';
-
-async function ensureAuthUser(uid: string, displayName?: string) {
+export async function POST(req: NextRequest) {
   try {
-    await adminAuth.getUser(uid);
-    console.log(`[pin-login] Auth user ${uid} already exists.`);
-  } catch {
-    console.log(`[pin-login] Auth user ${uid} not found, creating...`);
-    await adminAuth.createUser({ uid, displayName: displayName || uid });
-    console.log(`[pin-login] Auth user ${uid} created.`);
-  }
-}
+    const body = await req.json().catch(() => ({}));
+    const uid = (body.id || body.uid || "").trim();
+    const pin = (body.pin || "").trim();
 
-export async function POST(req: Request) {
-  try {
-    const { id, pin } = await req.json().catch(() => ({}));
-    console.log(`[pin-login] Attempting login for user id: ${id}`);
-
-    if (!id || !pin) {
-      console.error('[pin-login] Missing user ID or PIN in request.');
-      return NextResponse.json({ error: 'Missing user ID or PIN' }, { status: 400 });
+    if (!uid || !pin) {
+      return NextResponse.json({ error: "Missing id/pin" }, { status: 400 });
     }
 
-    const userRef = adminDb.collection('users').doc(id);
-    const secretRef = adminDb.collection('user_secrets').doc(id);
-    
-    console.log(`[pin-login] Fetching docs: users/${id} and user_secrets/${id}`);
-    const [userSnap, secretSnap] = await Promise.all([userRef.get(), secretRef.get()]);
+    const db = getAdminDb();
 
+    // 1) Load public user profile for status/role
+    const userSnap = await db.doc(`users/${uid}`).get();
     if (!userSnap.exists) {
-      console.warn(`[pin-login] User document not found for id: ${id}`);
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      console.warn("pin-login: user not found", uid);
+      return NextResponse.json({ error: "User not found" }, { status: 401 });
     }
-    const user = userSnap.data()!;
-    console.log(`[pin-login] Found user: ${user.name}, active: ${user.active}`);
+    const user = userSnap.data() as { active?: boolean; role?: Role; name?: string } | undefined;
+    if (!user?.active) {
+      console.warn("pin-login: user inactive", uid);
+      return NextResponse.json({ error: "User inactive" }, { status: 401 });
+    }
+    const role = user.role as Role;
+    const ALLOWED: Role[] = ["admin", "manager", "cashier", "waiter", "kitchen"];
+    if (!ALLOWED.includes(role)) {
+      console.warn("pin-login: invalid role", uid, role);
+      return NextResponse.json({ error: "Invalid role" }, { status: 401 });
+    }
 
-    if (!user.active) {
-      console.warn(`[pin-login] User account is inactive for id: ${id}`);
-      return NextResponse.json({ error: 'User account is inactive' }, { status: 403 });
-    }
-    
+    // 2) Load secret hash from user_secrets/{uid}
+    const secretSnap = await db.doc(`user_secrets/${uid}`).get();
     if (!secretSnap.exists) {
-        console.warn(`[pin-login] Secret document not found for id: ${id}`);
-        return NextResponse.json({ error: 'PIN not set for user' }, { status: 401 });
+      console.warn("pin-login: pin not set", uid);
+      return NextResponse.json({ error: "PIN not set" }, { status: 401 });
     }
-    const secret = secretSnap.data()!;
-
-    if (!secret.pinHash) {
-        console.warn(`[pin-login] 'pinHash' field missing in secret document for id: ${id}`);
-        return NextResponse.json({ error: 'PIN not set for user' }, { status: 401 });
+    const { pinHash } = secretSnap.data() as { pinHash?: string };
+    if (typeof pinHash !== "string" || pinHash.length < 20) {
+      console.warn("pin-login: bad pinHash", uid);
+      return NextResponse.json({ error: "PIN not set" }, { status: 401 });
     }
-    console.log(`[pin-login] Found pinHash for user ${id}. Comparing with provided PIN.`);
 
-    const ok = await bcrypt.compare(pin, secret.pinHash);
+    // 3) Verify PIN
+    const ok = await bcrypt.compare(pin, pinHash);
     if (!ok) {
-      console.warn(`[pin-login] Invalid PIN for user id: ${id}`);
-      return NextResponse.json({ error: 'Invalid PIN' }, { status: 401 });
+      console.warn("pin-login: invalid pin", uid);
+      return NextResponse.json({ error: "Invalid PIN" }, { status: 401 });
     }
-    
-    console.log(`[pin-login] PIN verified for ${id}. Ensuring Auth user and creating token.`);
-    await ensureAuthUser(id, user.name);
 
-    const role = user.role || 'cashier';
-    await adminAuth.setCustomUserClaims(id, { role });
-    const token = await adminAuth.createCustomToken(id, { role });
-    console.log(`[pin-login] Token created successfully for ${id} with role ${role}.`);
+    // 4) Mint custom token with role claim
+    const auth = getAdminAuth();
+    const token = await auth.createCustomToken(uid, { role });
 
-    return NextResponse.json({ token, role, uid: id });
+    return NextResponse.json({ token, role }, { status: 200 });
   } catch (e: any) {
-    console.error('[pin-login] Internal server error:', e);
-    return NextResponse.json({ error: 'Internal server error', details: e.message }, { status: 500 });
+    console.error("pin-login error:", e?.message || e);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
