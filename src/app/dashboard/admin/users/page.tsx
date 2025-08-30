@@ -2,8 +2,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { User, Role } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -13,10 +12,12 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, UserPlus, Search } from 'lucide-react';
 import { useAuth } from '@/stores/auth-store';
-import { format } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { UserFormDrawer, UserFormValues } from '@/components/admin/users/user-form-drawer';
 import { SetPinModal } from '@/components/admin/users/set-pin-modal';
+import { upsertUser, deleteUser } from '@/lib/functions/users';
+import { useToast } from '@/hooks/use-toast';
+import { fmtZAR } from '@/utils/money';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -25,7 +26,8 @@ export default function UsersPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [pinModalUser, setPinModalUser] = useState<User | null>(null);
-
+  
+  const { toast } = useToast();
   const { role: currentUserRole } = useAuth();
   const canDelete = currentUserRole === 'admin';
   const canEdit = currentUserRole === 'admin' || currentUserRole === 'manager';
@@ -41,46 +43,40 @@ export default function UsersPage() {
       setLoading(false);
     }, (error) => {
       console.error("Error fetching users: ", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not load user data.' });
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
-
-  const handleToggleActive = async (user: User) => {
-    if (!canEdit) return;
-    const userRef = doc(db, 'users', user.id);
-    await updateDoc(userRef, { active: !user.active });
-  };
+  }, [toast]);
 
   const handleDeleteUser = async (userId: string) => {
     if (!canDelete) return;
-    if (confirm('Are you sure you want to delete this user? This cannot be undone.')) {
-      const batch = writeBatch(db);
-      batch.delete(doc(db, 'users', userId));
-      batch.delete(doc(db, 'userSecrets', userId));
-      await batch.commit();
+    if (confirm('Are you sure you want to permanently delete this user and their auth account? This cannot be undone.')) {
+      try {
+        await deleteUser({ id: userId });
+        toast({ title: 'User deleted' });
+      } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Delete failed', description: error.message });
+      }
     }
   };
 
-  const handleSaveUser = async (userData: UserFormValues) => {
-    const functions = getFunctions();
-    const call = httpsCallable(functions, 'adminUpsertUser');
-    
-    const hourlyRateCents = Math.round(parseFloat(userData.hourlyRateZar || '0') * 100);
-
-    const payload = {
-        ...userData,
-        hourlyRateCents,
-        id: editingUser?.id, // Sent as id, which maps to uid on the backend
-    };
-    
-    // The pin is handled by the SetPinModal, so we don't pass it here.
-    // The backend function is smart enough to not require it.
-    await call(payload);
-
-    setDrawerOpen(false);
-    setEditingUser(null);
+  const handleSaveUser = async (data: UserFormValues) => {
+    try {
+      await upsertUser({
+          id: data.id,
+          name: data.name,
+          role: data.role,
+          active: data.active,
+          hourlyRateZar: Number(data.hourlyRateZar) || 0,
+      });
+      toast({ title: 'User saved successfully' });
+      setDrawerOpen(false);
+      setEditingUser(null);
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Save failed', description: error.message });
+    }
   };
 
   const openDrawerForEdit = (user: User) => {
@@ -162,7 +158,7 @@ export default function UsersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {typeof user.hourlyRateCents === 'number' ? `R ${(user.hourlyRateCents / 100).toFixed(2)}` : 'N/A'}
+                        {typeof user.hourlyRateCents === 'number' ? fmtZAR(user.hourlyRateCents) : 'N/A'}
                       </TableCell>
                       <TableCell className="text-right">
                         {canEdit && (
@@ -174,15 +170,12 @@ export default function UsersPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openDrawerForEdit(user)}>Edit</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openDrawerForEdit(user)}>Edit Details</DropdownMenuItem>
                               <DropdownMenuItem onClick={() => setPinModalUser(user)}>Set PIN</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleToggleActive(user)}>
-                                {user.active ? 'Deactivate' : 'Activate'}
-                              </DropdownMenuItem>
                               {canDelete && (
                                 <>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteUser(user.id)}>Delete</DropdownMenuItem>
+                                  <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteUser(user.id)}>Delete User</DropdownMenuItem>
                                 </>
                               )}
                             </DropdownMenuContent>

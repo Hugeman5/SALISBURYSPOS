@@ -1,106 +1,109 @@
 
-import {onCall} from "firebase-functions/v2/https";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import * as bcrypt from "bcryptjs";
-import {requireRole, Role, STAFF_ROLES} from "./utils";
+import {requireRole, Role} from "./utils";
 
 const db = admin.firestore();
 
+// --- Callable: adminUpsertUser ---
 type UpsertUserPayload = {
-  id?: string;
+  id: string;
   name: string;
   role: Role;
   active: boolean;
-  hourlyRateCents?: number;
-  hourlyRateZar?: number; // Kept for compatibility if client sends it
-  pin?: string | null;
+  hourlyRateZar: number;
 };
-
 export const adminUpsertUser = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
   const data = req.data as UpsertUserPayload;
 
-  const uid = data.id;
-  if (!uid) {
-    throw new Error("id is required");
+  // Validation
+  if (!data.id || !/^[a-z0-9-]{3,24}$/.test(data.id)) {
+    throw new HttpsError("invalid-argument", "ID must be 3-24 lowercase letters, numbers, or hyphens.");
+  }
+  if (!data.name || data.name.length < 1 || data.name.length > 64) {
+    throw new HttpsError("invalid-argument", "Name must be between 1 and 64 characters.");
+  }
+  const validRoles: Role[] = ["admin", "manager", "cashier", "waiter", "kitchen"];
+  if (!validRoles.includes(data.role)) {
+    throw new HttpsError("invalid-argument", "Invalid role specified.");
+  }
+  if (typeof data.hourlyRateZar !== "number" || data.hourlyRateZar < 0) {
+    throw new HttpsError("invalid-argument", "Hourly rate must be a non-negative number.");
+  }
+  if (req.auth?.token.role !== 'admin' && data.role === 'admin') {
+      throw new HttpsError("permission-denied", "Only an admin can assign the admin role.");
   }
 
-  const name = (data.name || "").trim();
-  if (!name) {
-    throw new Error("name is required");
-  }
+  const userRef = db.collection("users").doc(data.id);
+  const hourlyRateCents = Math.round(data.hourlyRateZar * 100);
 
-  const roleVal = data.role as Role;
-  if (!STAFF_ROLES.includes(roleVal)) {
-    throw new Error("Invalid role provided");
-  }
-
-  const active = !!data.active;
-
-  let hourlyRateCents = data.hourlyRateCents;
-  if (hourlyRateCents === undefined && typeof data.hourlyRateZar === "number") {
-    hourlyRateCents = Math.round(data.hourlyRateZar * 100);
-  }
-
-  const userRef = db.collection("users").doc(uid);
-  const userDoc: any = {
-    name,
-    role: roleVal,
-    active,
-    hourlyRateCents: hourlyRateCents ?? 0,
+  const userData = {
+    name: data.name,
+    role: data.role,
+    active: data.active,
+    hourlyRateCents,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   };
 
-  const existingUser = await userRef.get();
-  if (!existingUser.exists) {
-    userDoc.createdAt = admin.firestore.FieldValue.serverTimestamp();
+  const doc = await userRef.get();
+  if (!doc.exists) {
+     // Check for ID conflict on create
+     const conflictSnap = await db.collection('users').where('id', '==', data.id).limit(1).get();
+     if (!conflictSnap.empty) {
+         throw new HttpsError('already-exists', `A user with ID ${data.id} already exists.`);
+     }
+    // @ts-ignore
+    userData.createdAt = admin.firestore.FieldValue.serverTimestamp();
   }
+  
+  await userRef.set(userData, {merge: true});
 
-  await userRef.set(userDoc, {merge: true});
-
-  return {ok: true, uid};
+  return {ok: true, id: data.id};
 });
 
 
+// --- Callable: adminDeleteUser ---
+type DeleteUserPayload = { id: string };
+export const adminDeleteUser = onCall({cors: true}, async (req) => {
+    requireRole(req, ['admin']); // Only admins can hard delete
+    const data = req.data as DeleteUserPayload;
+    if (!data.id) throw new HttpsError("invalid-argument", "ID is required.");
+    
+    // Deleting the user, their secret, and their auth account
+    const batch = db.batch();
+    batch.delete(db.collection('users').doc(data.id));
+    batch.delete(db.collection('user_secrets').doc(data.id));
+    
+    await Promise.all([
+        batch.commit(),
+        admin.auth().deleteUser(data.id).catch(e => console.warn(`Auth user ${data.id} not found, continuing.`))
+    ]);
+
+    return { ok: true, id: data.id };
+});
+
+
+// --- Callable: adminSetUserPin ---
+type SetPinPayload = { id: string; pin: string; };
 export const adminSetUserPin = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
-  const {uid, pin, hourlyRateZar} = req.data || {};
+  const {id, pin} = req.data as SetPinPayload;
 
-  if (!uid || typeof uid !== "string") {
-    throw new Error("uid is required");
+  if (!id || typeof id !== "string") {
+    throw new HttpsError("invalid-argument", "User ID is required.");
   }
-
-  const updates: any = {};
-  const secretUpdates: any = {
+  if (typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
+    throw new HttpsError("invalid-argument", "A 4-digit pin is required.");
+  }
+  
+  const pinHash = await bcrypt.hash(pin, 10);
+  
+  await db.collection("user_secrets").doc(id).set({
+    pinHash,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  };
-
-  if (pin) {
-    if (typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
-      throw new Error("A 4-digit pin is required if provided");
-    }
-    secretUpdates.pinHash = await bcrypt.hash(pin, 10);
-  }
-
-  if (hourlyRateZar !== undefined) {
-    if (typeof hourlyRateZar !== "number" || hourlyRateZar < 0) {
-      throw new Error("hourlyRateZar must be a non-negative number if provided");
-    }
-    updates.hourlyRateCents = Math.round(hourlyRateZar * 100);
-  }
-
-  const batch = db.batch();
-
-  if (Object.keys(updates).length > 0) {
-    updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
-    batch.set(db.collection("users").doc(uid), updates, {merge: true});
-  }
-
-  if (Object.keys(secretUpdates).length > 1) { // more than just timestamp
-    batch.set(db.collection("userSecrets").doc(uid), secretUpdates, {merge: true});
-  }
-
-  await batch.commit();
+  }, { merge: true });
 
   return {ok: true};
 });

@@ -5,7 +5,6 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { v4 as uuidv4 } from 'uuid';
 import type { User, Role } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,17 +33,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 
 const roles: Role[] = ['admin', 'manager', 'cashier', 'waiter', 'kitchen'];
 
 const userFormSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
+  id: z.string().regex(/^[a-z0-9-]{3,24}$/, 'ID must be 3-24 lowercase letters, numbers, or hyphens.'),
+  name: z.string().min(1, 'Name is required.').max(64, 'Name cannot exceed 64 characters.'),
   role: z.enum(roles),
   active: z.boolean(),
-  avatarUrl: z.string().url().optional().or(z.literal('')),
-  hourlyRateZar: z.string().optional(),
+  hourlyRateZar: z.string().refine(val => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, {
+    message: "Hourly rate must be a non-negative number.",
+  }),
 });
 
 export type UserFormValues = z.infer<typeof userFormSchema>;
@@ -60,27 +59,34 @@ interface UserFormDrawerProps {
 export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole }: UserFormDrawerProps) {
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
-  });
-
-  useEffect(() => {
-    if (user) {
-      form.reset({
-        id: user.id,
-        name: user.name,
-        role: user.role,
-        active: user.active,
-        avatarUrl: user.avatarUrl || '',
-        hourlyRateZar: user.hourlyRateCents ? (user.hourlyRateCents / 100).toFixed(2) : '',
-      });
-    } else {
-      form.reset({
-        id: uuidv4(), // Generate a new ID for a new user
+    defaultValues: {
+        id: '',
         name: '',
         role: 'cashier',
         active: true,
-        avatarUrl: '',
-        hourlyRateZar: '',
-      });
+        hourlyRateZar: '0',
+    }
+  });
+
+  useEffect(() => {
+    if (isOpen) {
+        if (user) {
+          form.reset({
+            id: user.id,
+            name: user.name,
+            role: user.role,
+            active: user.active,
+            hourlyRateZar: user.hourlyRateCents ? (user.hourlyRateCents / 100).toFixed(2) : '0',
+          });
+        } else {
+          form.reset({
+            id: '',
+            name: '',
+            role: 'cashier',
+            active: true,
+            hourlyRateZar: '0',
+          });
+        }
     }
   }, [user, form, isOpen]);
 
@@ -89,18 +95,32 @@ export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole 
   };
   
   const canEditRole = currentUserRole === 'admin';
+  const isEditing = !!user;
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent>
+      <SheetContent className="w-[480px]">
         <SheetHeader>
           <SheetTitle>{user ? 'Edit User' : 'Add New User'}</SheetTitle>
           <SheetDescription>
-            {user ? `Update the details for ${user.name}.` : 'Create a new staff member account.'}
+            {user ? `Update the details for ${user.name}.` : 'Create a new staff member account. Remember to set a PIN to enable login.'}
           </SheetDescription>
         </SheetHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-6">
+            <FormField
+              control={form.control}
+              name="id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>User ID</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. john-doe" {...field} disabled={isEditing} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="name"
@@ -145,19 +165,6 @@ export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole 
                   <FormLabel>Hourly Rate (ZAR)</FormLabel>
                   <FormControl>
                     <Input type="number" step="0.01" placeholder="e.g., 120.50" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <FormField
-              control={form.control}
-              name="avatarUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Avatar URL (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://example.com/avatar.png" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

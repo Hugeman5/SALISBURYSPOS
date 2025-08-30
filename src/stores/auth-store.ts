@@ -4,16 +4,12 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { signInWithCustomToken, signOut, onAuthStateChanged, type User as FbUser } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import type { Role, User } from '@/types';
 
-type Role = 'admin'|'manager'|'cashier'|'waiter'|'kitchen';
 
-export type Profile = {
-  id: string;
-  name: string;
-  role: Role;
-  active: boolean;
-};
+export type Profile = Pick<User, 'id' | 'name' | 'role' | 'active'>;
 
 type AuthState = {
   profile: Profile | null;
@@ -55,7 +51,10 @@ export const useAuth = create<AuthState>()(
           }
 
           const { token, role } = await res.json();
-          await signInWithCustomToken(auth, token);
+          const userCredential = await signInWithCustomToken(auth, token);
+          
+          // After sign in, getFromFirebase will be triggered by onAuthStateChanged
+          // but we can set the role immediately for faster routing.
           set({ role: (role as Role) || 'cashier' });
           return true;
         } catch (e) {
@@ -85,15 +84,31 @@ export const useAuth = create<AuthState>()(
         const idTokenResult = await fb.getIdTokenResult(true);
         const roleClaim = (idTokenResult.claims.role as Role) || null;
         
-        set({
-            role: roleClaim,
-            profile: {
-                id: fb.uid,
-                name: fb.displayName || 'User',
-                role: (roleClaim || 'cashier') as Role,
-                active: true, // If they have a token, they must have been active at login
-            }
-        });
+        // Fetch the user document from Firestore to get the latest profile info
+        const userDoc = await getDoc(doc(db, "users", fb.uid));
+        if (userDoc.exists()) {
+            const userData = userDoc.data() as User;
+            set({
+                role: userData.role,
+                profile: {
+                    id: fb.uid,
+                    name: userData.name,
+                    role: userData.role,
+                    active: userData.active,
+                }
+            });
+        } else {
+             // Fallback if firestore doc is missing, though this shouldn't happen
+            set({
+                role: roleClaim,
+                profile: {
+                    id: fb.uid,
+                    name: fb.displayName || 'User',
+                    role: (roleClaim || 'cashier') as Role,
+                    active: true, 
+                }
+            });
+        }
       }
     }),
     {

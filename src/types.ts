@@ -14,7 +14,7 @@ export type User = {
   lastSignInAt?: Timestamp;
   email?: string;
   phone?: string;
-  hourlyRateCents?: number;
+  hourlyRateCents: number; // Stored as cents
 };
 
 export type Product = {

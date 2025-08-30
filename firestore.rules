@@ -1,64 +1,52 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // --- Utility Functions ---
-    function isRole(r) {
-      return request.auth != null && request.auth.token.role == r;
+    
+    function signedIn() { 
+      return request.auth != null; 
     }
-    function isAdmin()  { return isRole('admin'); }
-    function isManager(){ return isRole('manager'); }
-    function isStaff()  { return isRole('cashier') || isRole('waiter') || isRole('kitchen') || isManager() || isAdmin(); }
+    function hasRole(roles) {
+      return signedIn() && request.auth.token.role in roles;
+    }
+    function isAdmin()   { return hasRole(['admin']); }
+    function isManager() { return hasRole(['admin', 'manager']); }
+    function isStaff()   { return hasRole(['admin', 'manager', 'cashier', 'waiter', 'kitchen']); }
 
-    // --- Users & Secrets ---
+    // Public read so unauth login screen can list users
     match /users/{uid} {
-      // Publicly readable for login screen tiles.
       allow read: if true;
-      // Writes are restricted to admin/manager via server-side functions.
-      allow write: if isAdmin() || isManager();
+      allow write: if isManager(); // admin or manager
     }
 
-    match /userSecrets/{uid} {
-      // No client access. All reads/writes must be server-side.
-      allow read, write: if false;
+    // Never readable from client; only admin/manager can set/reset via callable
+    match /user_secrets/{uid} {
+      allow read: if false;
+      allow write: if false; // Writes must go through callables
     }
 
-    // --- Products & Categories (Admin/Manager control) ---
     match /products/{productId} {
       allow read: if isStaff();
-      allow write: if isAdmin() || isManager();
+      allow write: if isManager();
     }
+    
     match /categories/{categoryId} {
-      allow read: if isStaff();
-      allow write: if isAdmin() || isManager();
+       allow read: if isStaff();
+       allow write: if isManager();
     }
-
-    // --- Orders (Staff create/read, Manager/Admin full access) ---
+    
     match /orders/{orderId} {
       allow read: if isStaff();
-      allow create: if isStaff();
-      allow update: if isStaff();
-      allow delete: if isAdmin() || isManager();
-    }
-    
-    // --- Inventory (Reads for staff, writes for managers) ---
-    match /inventory_ledger/{ledgerId} {
-        allow read: if isStaff();
-        allow write: if false; // Only via functions
-    }
-    
-    // --- Z-Closures (Day-end reports) ---
-    match /z_closures/{closureId} {
-        allow read: if isManager() || isAdmin();
-        allow write: if false; // Only via functions
+      allow write: if isStaff();
     }
 
-    // --- Time Clock ---
-    match /time_clock/{uid}/{document=**} {
-        // Users can read/write to their own time clock records.
-        // Managers/Admins can read/write to anyone's records.
-        allow read, write: if isAdmin() || isManager() || request.auth.uid == uid;
+    match /inventory_ledger/{entryId} {
+        allow read: if isManager();
+        allow write: if isManager();
+    }
+
+    match /time_clock/{uid}/sessions/{sessionId} {
+      allow read: if isStaff();
+      allow write: if request.auth.uid == uid || isManager();
     }
   }
 }

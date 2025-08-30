@@ -3,15 +3,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth, attachAuthListenerOnce } from '@/stores/auth-store';
 import { useRouter } from 'next/navigation';
-import { Role } from '@/types';
+import { Role, User } from '@/types';
 import { PinKeypad } from '@/components/pin-keypad';
+import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
-type LoginableUser = { id: string; name: string; role: Role };
+type LoginableUser = Pick<User, 'id' | 'name' | 'role' | 'active'>;
 
 export default function LoginPage() {
   attachAuthListenerOnce();
   const router = useRouter();
   const { loginWithPin, loading, lastError, profile } = useAuth();
+  
   const [users, setUsers] = useState<LoginableUser[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [pin, setPin] = useState('');
@@ -25,19 +28,16 @@ export default function LoginPage() {
     }
   },[profile, router]);
 
-  // Fetch users who have a PIN set from the secure API endpoint
+  // Live user tiles from Firestore (public read)
   useEffect(() => {
-    async function fetchUsers() {
-        try {
-            const res = await fetch('/api/auth/loginable-users');
-            if (!res.ok) throw new Error('Failed to fetch users');
-            const { users: fetchedUsers } = await res.json();
-            setUsers(fetchedUsers || []);
-        } catch (error) {
-            console.error(error);
-        }
-    }
-    fetchUsers();
+    const q = query(collection(db, 'users'), where('active', '==', true), orderBy('name'));
+    const unsub = onSnapshot(q, (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+      setUsers(list);
+    }, (error) => {
+        console.error("Failed to fetch users:", error);
+    });
+    return () => unsub();
   }, []);
 
   // Debounced auto-submit when PIN length hits 4
@@ -53,7 +53,6 @@ export default function LoginPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin, selectedId]);
-
 
   const handleLogin = async () => {
     if (!selectedId || pin.length < 4) return;
@@ -83,7 +82,7 @@ export default function LoginPage() {
                 <div className="text-xs text-muted-foreground capitalize">{u.role}</div>
               </button>
             ))}
-             {users.length === 0 && <p className="text-muted-foreground col-span-3">No users with PINs found.</p>}
+             {users.length === 0 && <p className="text-muted-foreground col-span-3">No active users found.</p>}
           </div>
         </div>
 
