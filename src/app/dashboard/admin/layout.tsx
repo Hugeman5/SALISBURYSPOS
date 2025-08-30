@@ -21,6 +21,7 @@ import {
   DollarSign,
   Clock,
   Home,
+  ShoppingCart,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { LogoutButton } from '@/components/auth/logout-button';
@@ -30,6 +31,7 @@ import { RoleGate } from '@/components/auth-gate';
 
 const menuItems = [
   { href: '/dashboard/admin', title: 'Dashboard', icon: Home },
+  { href: '/pos/sale', title: 'Point of Sale', icon: ShoppingCart },
   { href: '/dashboard/admin/orders', title: 'Orders', icon: Receipt },
   { href: '/dashboard/admin/products', title: 'Products', icon: Package },
   { href: '/dashboard/admin/inventory', title: 'Inventory', icon: LayoutGrid },

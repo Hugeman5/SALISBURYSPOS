@@ -30,7 +30,7 @@ export function ProductGrid({ products, onAddToCart, loading }: ProductGridProps
   }
   
   if (products.length === 0) {
-    return <div className="text-center text-muted-foreground py-10">No products found.</div>
+    return <div className="text-center text-muted-foreground py-10">No products found for this category or search term.</div>
   }
 
   return (

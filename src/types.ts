@@ -76,6 +76,7 @@ export type Register = {
 
 export type RegisterSession = {
   id: string;
+  registerId: string;
   status: "open" | "closed";
   openedAt: Timestamp;
   openedBy: { uid: string; name: string };
