@@ -9,16 +9,15 @@ import {
 } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { User } from '@/types';
+import { fmtZAR } from '@/utils/money';
 
 type Punch = {
-  id: string;
   uid: string;
   inAt: Date;
   outAt?: Date | null;
   durationSec?: number | null;
 };
-
-type UserSecret = { hourlyRateCents?: number | null };
 
 function startOfToday(): Date {
   const d = new Date();
@@ -29,13 +28,6 @@ function endOfToday(): Date {
   const d = new Date();
   d.setHours(24, 0, 0, 0);
   return d;
-}
-function formatZAR(cents: number) {
-  try {
-    return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format((cents || 0) / 100);
-  } catch {
-    return `R ${( (cents || 0) / 100).toFixed(2)}`;
-  }
 }
 
 export default function StaffPayrollCard() {
@@ -52,70 +44,50 @@ export default function StaffPayrollCard() {
     if (!isBoss) return;
     setErr(null);
     try {
-      // 1) All open punches
+      // 1) Get all open punches (clocked-in staff)
       const openSnap = await getDocs(query(
         collectionGroup(db, 'sessions'),
         where('outAt', '==', null),
       ));
-      const openRows: Punch[] = openSnap.docs.map((d) => {
-        const x: any = d.data();
-        return {
-          id: d.id,
-          uid: x.uid,
-          inAt: x.inAt?.toDate?.() || new Date(),
-          outAt: null,
-          durationSec: null,
-        };
-      });
-      setOpenCount(openRows.length);
-      const uids = Array.from(new Set(openRows.map((r) => r.uid)));
+      const openPunches: Punch[] = openSnap.docs.map((d) => ({ ...d.data(), uid: d.ref.parent.parent!.id } as Punch));
+      setOpenCount(openPunches.length);
+      
+      const uids = Array.from(new Set(openPunches.map((p) => p.uid)));
 
-      // 2) Fetch hourlyRate for each uid from userSecrets
-      const rateByUid: Record<string, number> = {};
-      await Promise.all(uids.map(async (u) => {
-        try {
-          const secretDoc = await getDoc(doc(db, 'userSecrets', u));
-          const data = secretDoc.exists() ? (secretDoc.data() as UserSecret) : undefined;
-          rateByUid[u] = Math.max(0, Number(data?.hourlyRateCents ?? 0));
-        } catch {
-          rateByUid[u] = 0;
-        }
-      }));
+      // 2) Fetch user details for hourly rates
+      const userRates = new Map<string, number>();
+      if (uids.length > 0) {
+        const usersSnap = await getDocs(query(collection(db, 'users'), where('__name__', 'in', uids)));
+        usersSnap.forEach(doc => {
+            const userData = doc.data() as User;
+            userRates.set(doc.id, userData.hourlyRateCents || 0);
+        });
+      }
+      
+      // 3) Calculate live burn rate
+      const liveBurn = openPunches.reduce((acc, p) => acc + (userRates.get(p.uid) || 0), 0);
+      setLiveBurnPerHour(liveBurn);
 
-      // 3) Live burn per hour = sum(rate) for open shifts
-      const live = openRows.reduce((acc, r) => acc + (rateByUid[r.uid] || 0), 0);
-      setLiveBurnPerHour(live);
-
-      // 4) Today’s spend (open + closed)
+      // 4) Calculate today's total spend
       const todaySnap = await getDocs(query(
         collectionGroup(db, 'sessions'),
         where('inAt', '>=', startOfToday()),
         where('inAt', '<', endOfToday()),
       ));
-      
-      const allToday: Punch[] = todaySnap.docs.map((d) => {
-        const x: any = d.data();
-        return {
-          id: d.id,
-          uid: x.uid,
-          inAt: x.inAt?.toDate?.() || new Date(),
-          outAt: x.outAt?.toDate?.() || null,
-          durationSec: x.durationSec ?? null,
-        };
-      });
 
       const now = Date.now();
-      let total = 0;
-      for (const r of allToday) {
-        const rate = rateByUid[r.uid] ?? 0;
+      let totalSpend = 0;
+      todaySnap.forEach(d => {
+        const punch = d.data() as Punch;
+        const rate = userRates.get(punch.uid) || 0;
         if (rate > 0) {
-            const durSec = r.outAt
-              ? (r.durationSec || Math.max(0, Math.round((r.outAt.getTime() - r.inAt.getTime()) / 1000)))
-              : Math.max(0, Math.round((now - r.inAt.getTime()) / 1000));
-            total += (durSec / 3600) * rate;
+            const durSec = punch.outAt
+              ? (punch.durationSec || Math.max(0, Math.round((punch.outAt.getTime() - punch.inAt.getTime()) / 1000)))
+              : Math.max(0, Math.round((now - punch.inAt.getTime()) / 1000));
+            totalSpend += (durSec / 3600) * rate;
         }
-      }
-      setTodaySpend(total);
+      });
+      setTodaySpend(totalSpend);
 
     } catch (e: any) {
         setErr(e.message || 'Failed to compute payroll data');
@@ -176,13 +148,13 @@ export default function StaffPayrollCard() {
           <Card>
             <CardHeader className="pb-2">
                 <CardDescription>Live burn rate</CardDescription>
-                <CardTitle className="text-2xl">{formatZAR(liveBurnPerHour)} / hr</CardTitle>
+                <CardTitle className="text-2xl">{fmtZAR(liveBurnPerHour)} / hr</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
                 <CardDescription>Today’s spend</CardDescription>
-                <CardTitle className="text-2xl">{formatZAR(todaySpend)}</CardTitle>
+                <CardTitle className="text-2xl">{fmtZAR(todaySpend)}</CardTitle>
             </CardHeader>
           </Card>
         </div>

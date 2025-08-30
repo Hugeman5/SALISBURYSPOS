@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview Main entry point for all Firebase Cloud Functions.
  * This file exports all the callable functions, making them available to clients.

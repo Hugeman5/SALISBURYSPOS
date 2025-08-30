@@ -15,9 +15,9 @@ import { useAuth } from '@/stores/auth-store';
 import { Input } from '@/components/ui/input';
 import { UserFormDrawer, UserFormValues } from '@/components/admin/users/user-form-drawer';
 import { SetPinModal } from '@/components/admin/users/set-pin-modal';
-import { upsertUser, deleteUser } from '@/lib/functions/users';
 import { useToast } from '@/hooks/use-toast';
 import { fmtZAR } from '@/utils/money';
+import { call } from '@/lib/functions/call';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -54,7 +54,7 @@ export default function UsersPage() {
     if (!canDelete) return;
     if (confirm('Are you sure you want to permanently delete this user and their auth account? This cannot be undone.')) {
       try {
-        await deleteUser({ id: userId });
+        await call('adminDeleteUser', { id: userId });
         toast({ title: 'User deleted' });
       } catch (error: any) {
         toast({ variant: 'destructive', title: 'Delete failed', description: error.message });
@@ -64,7 +64,7 @@ export default function UsersPage() {
 
   const handleSaveUser = async (data: UserFormValues) => {
     try {
-      await upsertUser({
+      await call('adminUpsertUser', {
           id: data.id,
           name: data.name,
           role: data.role,

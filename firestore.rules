@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{db}/documents {
@@ -10,69 +11,67 @@ service cloud.firestore {
       );
     }
 
-    // USERS: list on login needs to be readable by anyone (no auth) OR staff only.
-    // If you want public login list: replace `isStaff()` with `true`.
+    // USERS: Publicly readable for login screen. Writes only via callables.
     match /users/{uid} {
-      allow read: if true; // show name/avatar/role/active on login screen
-      allow write: if false; // writes only via callable functions
+      allow read: if true;
+      allow write: if false; 
     }
 
-    // User secrets (PIN hashes) never readable/writable from client
+    // User secrets (PIN hashes) are never client-accessible.
     match /user_secrets/{uid} {
       allow read, write: if false;
     }
 
-    // Products
+    // Products are readable by staff, writable only via callables.
     match /products/{id} {
       allow read: if isStaff();
       allow write: if false;
     }
 
-    // Inventory ledger
+    // Inventory ledger is readable by admin/managers, writable only via callables.
     match /inventory_ledger/{id} {
       allow read: if hasRole('admin') || hasRole('manager');
       allow write: if false;
     }
 
-    // Orders (staff can read)
+    // Orders are readable by staff, writable only via callables.
     match /orders/{id} {
       allow read: if isStaff();
       allow write: if false;
     }
+    
+    // Categories are readable by staff, writable only via callables.
+    match /categories/{id} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
 
-    // Time clock / sessions
+    // Time clock sessions are readable by staff. Writable only by callables.
+    // The collection group rule allows dashboard widgets to query across all users.
     match /time_clock/{uid}/sessions/{sessionId} {
       allow read: if isStaff();
-      allow write: if false; // All writes via callables
+      allow write: if false;
     }
-    
+
+    // Register sessions readable by admin/managers.
     match /register_sessions/{id} {
       allow read: if hasRole('admin') || hasRole('manager');
       allow write: if false;
     }
+    
     match /register_sessions/{id}/cash_movements/{moveId} {
-      allow read: if hasRole('admin') || hasRole('manager');
-      allow write: if false;
+        allow read: if hasRole('admin') || hasRole('manager');
+        allow write: if false;
     }
 
-    // Z-Reports
+    // Z-Reports readable by admin/managers.
     match /z_closures/{dateKey} {
       allow read: if hasRole('admin') || hasRole('manager');
       allow write: if false;
     }
 
-    // Settings (locked for now)
+    // Settings (locked for now).
     match /settings/{doc} {
-      allow read: if isStaff();
-      allow write: if false;
-    }
-     // Categories (locked for now)
-    match /categories/{doc} {
-      allow read: if isStaff();
-      allow write: if false;
-    }
-     // Registers (locked for now)
-    match /registers/{doc} {
       allow read: if isStaff();
       allow write: if false;
     }

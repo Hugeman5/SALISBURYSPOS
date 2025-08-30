@@ -6,6 +6,7 @@ export type Role = 'admin'|'manager'|'cashier'|'waiter'|'kitchen';
 export type User = {
   id: string;
   name: string;
+  nameLower: string;
   role: Role;
   active: boolean;
   avatarUrl?: string;
@@ -108,5 +109,3 @@ export type ZClosure = {
   perRegister: { [key: string]: { sessions: number; cashMovementsTotal: number; overShort: number } };
   notes?: string;
 };
-
-    
