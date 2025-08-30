@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/stores/auth-store';
@@ -22,26 +22,28 @@ export default function SalePage() {
   const [cart, setCart] = useState<CartLineItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const q = query(
-          collection(db, 'products'),
-          where('active', '==', true),
-          orderBy('name'),
-          limit(100)
-        );
-        const snapshot = await getDocs(q);
-        const productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-        setProducts(productsData);
-      } catch (error) {
-        console.error("Error fetching products:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProducts();
+  const fetchProducts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const q = query(
+        collection(db, 'products'),
+        where('active', '==', true),
+        orderBy('nameLower'),
+        limit(250) // Increased limit for better usability
+      );
+      const snapshot = await getDocs(q);
+      const productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+      setProducts(productsData);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   const handleAddToCart = (product: Product) => {
     setCart(prevCart => {
@@ -61,7 +63,8 @@ export default function SalePage() {
             qty: 1,
             priceInclCents: product.price.incCents,
             vatRate: product.price.taxRate,
-            stockOnHand: product.stockOnHand ?? 0,
+            stockOnHand: product.stockOnHand, // Keep track of stock
+            trackStock: product.trackStock,
           },
         ];
       }
@@ -72,9 +75,10 @@ export default function SalePage() {
     if (!searchTerm) {
       return products;
     }
+    const lowercasedTerm = searchTerm.toLowerCase();
     return products.filter(p =>
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.sku.toLowerCase().includes(searchTerm.toLowerCase())
+      p.name.toLowerCase().includes(lowercasedTerm) ||
+      p.sku.toLowerCase().includes(lowercasedTerm)
     );
   }, [products, searchTerm]);
 

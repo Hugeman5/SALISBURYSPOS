@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CartLineItem } from '@/types/pos';
+import { CartLineItem, Payment } from '@/types/pos';
 import { fmtZAR, parseToCents } from '@/utils/money';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -28,6 +28,8 @@ interface CheckoutModalProps {
   cashierName: string;
   onSuccess: () => void;
 }
+
+type PaymentType = Payment['type'];
 
 export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, cashierName, onSuccess }: CheckoutModalProps) {
   const { toast } = useToast();
@@ -45,8 +47,10 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, cashie
     onClose();
   }
 
-  const handleFinalize = async () => {
-    if (amountTendered < totals.totalInc) {
+  const handleFinalize = async (type: PaymentType) => {
+    const finalAmount = type === 'card' ? totals.totalInc : amountTendered;
+
+    if (finalAmount < totals.totalInc) {
       toast({
         variant: 'destructive',
         title: 'Insufficient Amount',
@@ -68,15 +72,15 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, cashie
 
       await call('cashierTakePayment', {
         orderId: newOrderId,
-        type: 'cash', // Assuming cash for now
-        amount: amountTendered
+        type,
+        amount: finalAmount
       });
       
       await call('cashierCloseOrder', { orderId: newOrderId });
 
       toast({
         title: "Sale Successful",
-        description: `Change due: ${fmtZAR(changeDue)}`,
+        description: type === 'cash' ? `Change due: ${fmtZAR(changeDue)}` : 'Payment complete.',
       });
       
       onSuccess();
@@ -93,6 +97,10 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, cashie
     }
   };
 
+  const handleExactCash = () => {
+    setAmountTenderedStr((totals.totalInc / 100).toFixed(2));
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose() }}>
       <DialogContent onPointerDownOutside={(e) => { if (isProcessing) e.preventDefault() }}>
@@ -107,7 +115,7 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, cashie
                 <div className="py-4 flex justify-center">
                     <Button asChild size="lg">
                         <Link href={`/pos/orders/${completedOrderId}?print=true`} target="_blank">
-                            View Receipt
+                            View & Print Receipt
                         </Link>
                     </Button>
                 </div>
@@ -124,30 +132,34 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, cashie
                 </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="amount-tendered" className="text-right">
-                    Amount Tendered
-                    </Label>
-                    <Input
-                    id="amount-tendered"
-                    value={amountTenderedStr}
-                    onChange={(e) => setAmountTenderedStr(e.target.value)}
-                    className="col-span-3"
-                    type="number"
-                    placeholder="e.g., 500.00"
-                    autoFocus
-                    />
+                  <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="amount-tendered" className="text-right">
+                      Cash Tendered
+                      </Label>
+                      <Input
+                      id="amount-tendered"
+                      value={amountTenderedStr}
+                      onChange={(e) => setAmountTenderedStr(e.target.value)}
+                      className="col-span-3"
+                      type="number"
+                      placeholder="e.g., 500.00"
+                      autoFocus
+                      />
+                  </div>
+                  <div className="text-right">
+                    <Button variant="link" size="sm" onClick={handleExactCash}>Exact Cash</Button>
+                  </div>
+                  <div className="text-right text-lg">
+                      Change Due: <span className="font-bold">{fmtZAR(changeDue)}</span>
+                  </div>
                 </div>
-                <div className="text-right text-lg">
-                    Change Due: <span className="font-bold">{fmtZAR(changeDue)}</span>
-                </div>
-                </div>
-                <DialogFooter>
-                <Button variant="outline" onClick={handleClose} disabled={isProcessing}>Cancel</Button>
-                <Button onClick={handleFinalize} disabled={isProcessing}>
-                    {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Finalize Sale
-                </Button>
+                <DialogFooter className="grid grid-cols-2 gap-2">
+                  <Button variant="secondary" size="lg" onClick={() => handleFinalize('card')} disabled={isProcessing}>
+                      {isProcessing ? <Loader2 className="animate-spin" /> : 'Pay by Card'}
+                  </Button>
+                  <Button size="lg" onClick={() => handleFinalize('cash')} disabled={isProcessing}>
+                      {isProcessing ? <Loader2 className="animate-spin" /> : 'Finalize Cash Sale'}
+                  </Button>
                 </DialogFooter>
             </>
         )}

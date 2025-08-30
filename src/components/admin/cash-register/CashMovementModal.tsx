@@ -1,7 +1,6 @@
 
 'use client';
 
-import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -10,10 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { postCashMovement } from '@/lib/functions/cash-register';
 import type { RegisterSession } from '@/types';
 import type { Profile } from '@/stores/auth-store';
 import { Loader2 } from 'lucide-react';
+import { call } from '@/lib/functions/call';
 
 const formSchema = z.object({
   amount: z.coerce.number().positive('Amount must be positive.'),
@@ -39,7 +38,7 @@ export function CashMovementModal({ type, session, onClose, profile }: CashMovem
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!profile) return;
     try {
-      await postCashMovement({
+      await call('postCashMovement', {
         sessionId: session.id,
         type,
         amount: values.amount * 100, // convert to cents
@@ -104,5 +103,3 @@ export function CashMovementModal({ type, session, onClose, profile }: CashMovem
     </Dialog>
   );
 }
-
-    

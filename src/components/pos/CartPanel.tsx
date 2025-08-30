@@ -1,3 +1,4 @@
+
 'use client';
 import { useMemo, useState } from 'react';
 import { CartLineItem } from '@/types/pos';
@@ -26,8 +27,8 @@ export function CartPanel({ cart, setCart, cashierId, cashierName }: CartPanelPr
       if (!item) return currentCart;
 
       const newQty = item.qty + delta;
-      
-      if (item.stockOnHand !== undefined && newQty > item.stockOnHand) {
+
+      if (item.trackStock && item.stockOnHand !== undefined && newQty > item.stockOnHand) {
         toast({
             variant: "destructive",
             title: "Stock Limit Reached",

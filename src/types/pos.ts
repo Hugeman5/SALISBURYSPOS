@@ -1,3 +1,4 @@
+
 import type { Timestamp } from 'firebase/firestore';
 
 export interface Product {
@@ -8,7 +9,8 @@ export interface Product {
     incCents: number;
     taxRate: number;
   };
-  stockOnHand: number;
+  stockOnHand?: number;
+  trackStock: boolean;
   active: boolean;
 }
 
@@ -56,4 +58,5 @@ export interface CartLineItem {
   priceInclCents: number;
   vatRate: number;
   stockOnHand?: number;
+  trackStock: boolean;
 }

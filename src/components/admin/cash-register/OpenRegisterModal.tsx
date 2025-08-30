@@ -1,7 +1,6 @@
 
 'use client';
 
-import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -11,10 +10,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { openRegisterSession } from '@/lib/functions/cash-register';
 import type { Register } from '@/types';
 import type { Profile } from '@/stores/auth-store';
 import { Loader2 } from 'lucide-react';
+import { call } from '@/lib/functions/call';
 
 const formSchema = z.object({
   registerId: z.string().min(1, 'Please select a register.'),
@@ -40,7 +39,8 @@ export function OpenRegisterModal({ isOpen, onClose, registers, profile }: OpenR
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!profile) return;
     try {
-      await openRegisterSession({
+      await call('manageRegisterSession', {
+        action: 'open',
         registerId: values.registerId,
         openingFloat: values.openingFloat * 100, // convert to cents
       });
@@ -114,5 +114,3 @@ export function OpenRegisterModal({ isOpen, onClose, registers, profile }: OpenR
     </Dialog>
   );
 }
-
-    

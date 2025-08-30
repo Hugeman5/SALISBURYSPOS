@@ -1,25 +1,24 @@
 
 'use client';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, where, limit, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
 import { useAuth } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, PlusCircle } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { PlusCircle } from 'lucide-react';
 import { fmtZAR } from '@/utils/money';
 import { format } from 'date-fns';
 import type { Register, RegisterSession, CashMovement } from '@/types';
 import { OpenRegisterModal } from '@/components/admin/cash-register/OpenRegisterModal';
 import { CashMovementModal } from '@/components/admin/cash-register/CashMovementModal';
-import { closeRegisterSession } from '@/lib/functions/cash-register';
+import { call } from '@/lib/functions/call';
 import { useToast } from '@/hooks/use-toast';
 
 export default function CashRegisterPage() {
-    const { profile, role } = useAuth();
+    const { profile } = useAuth();
     const { toast } = useToast();
     const [registers, setRegisters] = useState<Register[]>([]);
     const [sessions, setSessions] = useState<RegisterSession[]>([]);
@@ -32,6 +31,7 @@ export default function CashRegisterPage() {
     const openSession = useMemo(() => sessions.find(s => s.status === 'open'), [sessions]);
 
     useEffect(() => {
+        setLoading(true);
         const qRegisters = query(collection(db, 'registers'), orderBy('name'));
         const unsubRegisters = onSnapshot(qRegisters, (snap) => {
             setRegisters(snap.docs.map(d => ({ id: d.id, ...d.data() } as Register)));
@@ -75,7 +75,7 @@ export default function CashRegisterPage() {
             return;
         }
         try {
-            await closeRegisterSession({ sessionId: openSession.id, countedCash: counted * 100 });
+            await call('manageRegisterSession', { action: 'close', sessionId: openSession.id, countedCash: counted * 100 });
             toast({ title: "Register session closed successfully." });
         } catch (error: any) {
             toast({ variant: "destructive", title: "Failed to close session", description: error.message });
@@ -206,5 +206,3 @@ export default function CashRegisterPage() {
         </div>
     );
 }
-
-    
