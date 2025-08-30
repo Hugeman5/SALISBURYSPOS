@@ -2,9 +2,9 @@
  * @fileoverview Cloud Functions for product and category management.
  */
 
-import {onCall, HttpsError, type CallableRequest} from "firebase-functions/v2/https";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import {db, requireRole, Role} from "./utils";
+import {db, requireRole} from "./utils";
 
 /**
  * Helper to normalize money strings (e.g., "123.45") into integer cents.
