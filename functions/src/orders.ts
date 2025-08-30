@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview Cloud Functions for order management and processing.
  */
@@ -166,7 +167,7 @@ export const cashierCloseOrder = onCall({cors: true}, async (req) => {
       throw new HttpsError("failed-precondition", "Insufficient payment");
     }
 
-    // This part should be batched for efficiency
+    // Handle inventory update
     const productIds = items.map((item) => item.productId);
     const productsById = await getProductsByIds(productIds);
 
@@ -193,10 +194,37 @@ export const cashierCloseOrder = onCall({cors: true}, async (req) => {
       });
     }
 
-    tx.update(orderRef, {
-      status: "paid", closedAt: admin.firestore.FieldValue.serverTimestamp(),
+    const orderUpdate: Record<string, any> = {
+      status: "paid",
+      closedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    };
+
+    // If cash was used, update the register session and link it to the order
+    const hasCashPayment = payments.some((p) => p.type === "cash");
+    if (hasCashPayment) {
+      const openSessionSnap = await db.collection("register_sessions")
+        .where("status", "==", "open").limit(1).get();
+
+      if (openSessionSnap.empty) {
+        throw new HttpsError(
+          "failed-precondition",
+          "A register session must be open to accept cash payments."
+        );
+      }
+      const openDoc = openSessionSnap.docs[0];
+      orderUpdate.registerSessionId = openDoc.id;
+
+      const cashTotal = payments
+        .filter((p) => p.type === "cash")
+        .reduce((sum, p) => sum + p.amount, 0);
+
+      tx.update(openDoc.ref, {
+        expectedCash: admin.firestore.FieldValue.increment(cashTotal),
+      });
+    }
+
+    tx.update(orderRef, orderUpdate);
   });
   return {ok: true};
 });
@@ -274,7 +302,6 @@ export const cashierRefundItems = onCall({cors: true}, async (req) => {
         );
       }
       const sessionRef = openSessionSnap.docs[0].ref;
-      const session = openSessionSnap.docs[0].data();
       const movementRef = sessionRef.collection("cash_movements").doc();
       const delta = -totalRefundAmount;
 
