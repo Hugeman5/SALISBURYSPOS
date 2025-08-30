@@ -60,3 +60,24 @@ export interface CartLineItem {
   stockOnHand?: number;
   trackStock: boolean;
 }
+
+export interface RefundItem {
+    productId: string;
+    qty: number;
+    priceInc: number;
+    name: string;
+}
+
+export interface Refund {
+    id: string;
+    createdAt: Timestamp;
+    createdBy: {
+        uid: string;
+        name: string;
+    };
+    items: RefundItem[];
+    method: 'cash' | 'card';
+    originalOrderId: string;
+    reason?: string;
+    totalRefundAmount: number; // in cents
+}

@@ -29,6 +29,7 @@ export {
   cashierSetItems,
   cashierTakePayment,
   cashierCloseOrder,
+  cashierRefundItems,
 } from "./orders";
 
 // Reporting
