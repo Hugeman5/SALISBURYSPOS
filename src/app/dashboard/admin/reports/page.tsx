@@ -2,8 +2,7 @@
 'use client';
 
 import React from 'react';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app as firebaseApp, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { collection, doc, getDoc } from 'firebase/firestore';
 import { useAuth } from '@/stores/auth-store';
 import { format } from 'date-fns';
@@ -13,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { fmtZAR } from '@/utils/money';
 import Link from 'next/link';
+import { call } from '@/lib/functions/call';
 
 type ZTotals = {
   countPaid: number;
@@ -33,7 +33,6 @@ export default function ReportsPage() {
   const [loading, setLoading] = React.useState(false);
   const [totals, setTotals] = React.useState<ZTotals | null>(null);
   const [message, setMessage] = React.useState<string>('');
-  const fns = React.useMemo(() => getFunctions(firebaseApp, 'us-central1'), []);
 
   const loadExisting = React.useCallback(async () => {
     setLoading(true);
@@ -59,14 +58,13 @@ export default function ReportsPage() {
   async function closeDay() {
     setLoading(true); setMessage('');
     try {
-      const callable = httpsCallable(fns, 'adminCloseDay');
-      const res: any = await callable({ date });
-      if (res?.data?.ok) {
-        setTotals(res.data.totals);
+      const res = await call<any, any>('adminCloseDay', { date });
+      if (res?.ok) {
+        setTotals(res.totals);
         setMessage('Z-Report generated successfully.');
         toast({ title: 'Success', description: 'Day-end report has been generated.' });
       } else {
-        const error = res?.data?.error || 'Failed to close day';
+        const error = res?.error || 'Failed to close day';
         setMessage(error);
         toast({ variant: 'destructive', title: 'Error', description: error });
       }
@@ -81,18 +79,17 @@ export default function ReportsPage() {
   async function exportCsv() {
     setLoading(true); setMessage('');
     try {
-      const callable = httpsCallable(fns, 'adminExportZCsv');
-      const res: any = await callable({ date });
-      if (res?.data?.ok && res.data.csv) {
-        const blob = new Blob([res.data.csv], { type: 'text/csv;charset=utf-8' });
+      const res = await call<any, any>('adminExportZCsv', { date });
+      if (res?.ok && res.csv) {
+        const blob = new Blob([res.csv], { type: 'text/csv;charset=utf-8' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = res.data.filename || `z_${date}.csv`;
+        a.download = res.filename || `z_${date}.csv`;
         a.click();
         URL.revokeObjectURL(a.href);
         setMessage('CSV downloaded.');
       } else {
-        const error = res?.data?.error || 'Export failed';
+        const error = res?.error || 'Export failed';
         setMessage(error);
         toast({ variant: 'destructive', title: 'Error', description: error });
       }

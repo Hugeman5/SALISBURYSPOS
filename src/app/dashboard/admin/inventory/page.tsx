@@ -3,7 +3,6 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { collection, getDocs, query, where, orderBy, limit, Timestamp } from "firebase/firestore";
-import { getFunctions, httpsCallable } from "firebase/functions";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/stores/auth-store";
 import type { InventoryLedger, MovementType, Product } from "@/types";
@@ -22,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { call } from "@/lib/functions/call";
 
 type ProductWithStock = Product & { stockOnHand?: number };
 
@@ -162,10 +162,8 @@ function InventoryLedger({ canWrite }: { canWrite: boolean }) {
 
     const handleExport = async () => {
         try {
-            const functions = getFunctions();
-            const call = httpsCallable(functions, "adminExportLedger");
-            const result: any = await call({});
-            const { filename, mime, dataBase64 } = result.data;
+            const result: any = await call("adminExportLedger", {});
+            const { filename, mime, dataBase64 } = result;
             const byteCharacters = atob(dataBase64);
             const byteNumbers = new Array(byteCharacters.length);
             for (let i = 0; i < byteCharacters.length; i++) {
@@ -289,9 +287,7 @@ function AdjustStockSheet({ product, onClose, onSuccess }: { product: ProductWit
 
         setSubmitting(true);
         try {
-            const functions = getFunctions();
-            const call = httpsCallable(functions, "adminPostStockMovement");
-            await call({
+            await call("adminPostStockMovement", {
                 productId: product.id,
                 type,
                 qty: numQty,

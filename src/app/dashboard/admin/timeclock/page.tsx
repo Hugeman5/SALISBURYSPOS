@@ -2,10 +2,9 @@
 'use client';
 
 import React from 'react';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app as firebaseApp, db } from '@/lib/firebase';
 import { useAuth } from '@/stores/auth-store';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { fmtZAR } from '@/utils/money';
+import { call } from '@/lib/functions/call';
 
 type Punch = {
   id: string;
@@ -27,7 +27,6 @@ export default function TimeClockPage() {
   const { toast } = useToast();
 
   const uid = profile?.id || '';
-  const fns = React.useMemo(() => getFunctions(firebaseApp, 'us-central1'), []);
   
   const [loading, setLoading] = React.useState(false);
   const [isIn, setIsIn] = React.useState<boolean>(false);
@@ -77,14 +76,13 @@ export default function TimeClockPage() {
   const doClockIn = async () => {
     setLoading(true);
     try {
-      const call = httpsCallable(fns, 'clockIn');
-      const res: any = await call({});
-      if (res.data?.ok) {
+      const res = await call<any, any>('clockIn', {});
+      if (res?.ok) {
         await refreshState();
         await loadToday();
-        toast({ title: res.data.already ? "Already clocked in." : "Clocked in successfully." });
+        toast({ title: res.already ? "Already clocked in." : "Clocked in successfully." });
       } else {
-        toast({ variant: 'destructive', title: "Clock-in failed", description: res.data?.error });
+        toast({ variant: 'destructive', title: "Clock-in failed", description: res.error });
       }
     } catch (e: any) {
       toast({ variant: 'destructive', title: "Error", description: e?.message || String(e) });
@@ -96,14 +94,13 @@ export default function TimeClockPage() {
   const doClockOut = async () => {
     setLoading(true);
     try {
-      const call = httpsCallable(fns, 'clockOut');
-      const res: any = await call({});
-      if (res.data?.ok) {
+      const res = await call<any, any>('clockOut', {});
+      if (res?.ok) {
         await refreshState();
         await loadToday();
         toast({ title: "Clocked out successfully." });
       } else {
-        toast({ variant: 'destructive', title: "Clock-out failed", description: res.data?.error });
+        toast({ variant: 'destructive', title: "Clock-out failed", description: res.error });
       }
     } catch (e: any) {
       toast({ variant: 'destructive', title: "Error", description: e?.message || String(e) });
@@ -119,18 +116,17 @@ export default function TimeClockPage() {
       start.setHours(0, 0, 0, 0);
       const end = new Date();
       end.setHours(24, 0, 0, 0);
-      const call = httpsCallable(fns, 'adminExportTimeCsv');
-      const res: any = await call({ startMs: start.getTime(), endMs: end.getTime() });
-      if (res.data?.ok && res.data.csv) {
-        const blob = new Blob([res.data.csv], { type: 'text/csv;charset=utf-8' });
+      const res = await call<any, any>('adminExportTimeCsv', { startMs: start.getTime(), endMs: end.getTime() });
+      if (res?.ok && res.csv) {
+        const blob = new Blob([res.csv], { type: 'text/csv;charset=utf-8' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = res.data.filename || `time_${format(start, 'yyyy-MM-dd')}.csv`;
+        a.download = res.filename || `time_${format(start, 'yyyy-MM-dd')}.csv`;
         a.click();
         URL.revokeObjectURL(a.href);
         toast({ title: "CSV downloaded." });
       } else {
-        toast({ variant: 'destructive', title: "Export failed", description: res.data?.error });
+        toast({ variant: 'destructive', title: "Export failed", description: res.error });
       }
     } catch (e: any) {
       toast({ variant: 'destructive', title: "Error", description: e?.message || String(e) });

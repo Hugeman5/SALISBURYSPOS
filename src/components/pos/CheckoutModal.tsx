@@ -16,8 +16,8 @@ import { CartLineItem } from '@/types/pos';
 import { fmtZAR, parseToCents } from '@/utils/money';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import Link from 'next/link';
+import { call } from '@/lib/functions/call';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -38,8 +38,6 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, cashie
   const amountTendered = useMemo(() => parseToCents(amountTenderedStr), [amountTenderedStr]);
   const changeDue = useMemo(() => Math.max(0, amountTendered - totals.totalInc), [amountTendered, totals.totalInc]);
   
-  const functions = getFunctions();
-
   const handleClose = () => {
     setAmountTenderedStr('');
     setCompletedOrderId(null);
@@ -60,26 +58,21 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, cashie
     setProcessing(true);
     
     try {
-      const cashierCreateOrder = httpsCallable(functions, 'cashierCreateOrder');
-      const { data: createData } = await cashierCreateOrder({ note: '' });
-      const newOrderId = (createData as any).orderId;
+      const { orderId: newOrderId } = await call<{ orderId: string }, any>('cashierCreateOrder', { note: '' });
       if (!newOrderId) throw new Error("Failed to create order.");
 
-      const cashierSetItems = httpsCallable(functions, 'cashierSetItems');
-      await cashierSetItems({ 
+      await call('cashierSetItems', { 
         orderId: newOrderId,
         items: cart.map(item => ({ productId: item.productId, qty: item.qty })) 
       });
 
-      const cashierTakePayment = httpsCallable(functions, 'cashierTakePayment');
-      await cashierTakePayment({
+      await call('cashierTakePayment', {
         orderId: newOrderId,
         type: 'cash', // Assuming cash for now
         amount: amountTendered
       });
       
-      const cashierCloseOrder = httpsCallable(functions, 'cashierCloseOrder');
-      await cashierCloseOrder({ orderId: newOrderId });
+      await call('cashierCloseOrder', { orderId: newOrderId });
 
       toast({
         title: "Sale Successful",

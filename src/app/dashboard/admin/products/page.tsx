@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { getFunctions, httpsCallable } from "firebase/functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -14,6 +13,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { call } from "@/lib/functions/call";
 
 type Product = {
   id: string;
@@ -60,7 +60,7 @@ export default function ProductsPage() {
         toast({ variant: 'destructive', title: 'Error loading products', description: e.message });
     } finally { setLoading(false); }
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [toast]);
 
   const filtered = useMemo(() => {
     const k = search.trim().toLowerCase();
@@ -76,8 +76,6 @@ export default function ProductsPage() {
     if (!edit) return;
     setIsSaving(true);
     try {
-      const functions = getFunctions();
-      const call = httpsCallable(functions, "adminUpsertProduct");
       const priceIncZAR = (document.getElementById("priceIncZAR") as HTMLInputElement)?.value;
       const costIncZAR = (document.getElementById("costIncZAR") as HTMLInputElement)?.value;
       
@@ -93,7 +91,7 @@ export default function ProductsPage() {
         taxRate: (edit as any).price?.taxRate ?? 0.15,
       };
       
-      await call(payload);
+      await call("adminUpsertProduct", payload);
       toast({ title: 'Product saved' });
       setEdit(null);
       await load();
@@ -108,9 +106,7 @@ export default function ProductsPage() {
     if (!confirm) return;
     setIsDeleting(true);
     try {
-        const functions = getFunctions();
-        const call = httpsCallable(functions, "adminDeleteProduct");
-        await call({ id: confirm.id });
+        await call("adminDeleteProduct", { id: confirm.id });
         toast({ title: 'Product deleted' });
         setConfirm(null);
         await load();
@@ -123,10 +119,8 @@ export default function ProductsPage() {
 
   async function onExport() {
     try {
-        const functions = getFunctions();
-        const call = httpsCallable(functions, "adminExportProducts");
-        const res = await call({});
-        const csv = (res.data as any).csv as string;
+        const res = await call<{ csv: string }, any>("adminExportProducts", {});
+        const csv = res.csv;
         const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -290,14 +284,12 @@ function CSVImport({ onImported }: { onImported: ()=>void }) {
     if (!files || !files[0]) return;
     setBusy(true);
     try {
-      const functions = getFunctions();
-      const call = httpsCallable(functions, "adminBulkImportProducts");
       const text = await files[0].text();
-      const res: any = await call({ csv: text });
+      const res: any = await call("adminBulkImportProducts", { csv: text });
       
       toast({
         title: "Import Complete",
-        description: `${res.data.imported} products were imported.`,
+        description: `${res.imported} products were imported.`,
       });
       onImported();
 
