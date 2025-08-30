@@ -32,8 +32,8 @@ export const adminUpsertUser = onCall({cors: true}, async (req) => {
   if (typeof data.hourlyRateZar !== "number" || data.hourlyRateZar < 0) {
     throw new HttpsError("invalid-argument", "Hourly rate must be a non-negative number.");
   }
-  if (req.auth?.token.role !== 'admin' && data.role === 'admin') {
-      throw new HttpsError("permission-denied", "Only an admin can assign the admin role.");
+  if (req.auth?.token.role !== "admin" && data.role === "admin") {
+    throw new HttpsError("permission-denied", "Only an admin can assign the admin role.");
   }
 
   const userRef = db.collection("users").doc(data.id);
@@ -49,15 +49,15 @@ export const adminUpsertUser = onCall({cors: true}, async (req) => {
 
   const doc = await userRef.get();
   if (!doc.exists) {
-     // Check for ID conflict on create
-     const conflictSnap = await db.collection('users').where('id', '==', data.id).limit(1).get();
-     if (!conflictSnap.empty) {
-         throw new HttpsError('already-exists', `A user with ID ${data.id} already exists.`);
-     }
+    // Check for ID conflict on create
+    const conflictSnap = await db.collection("users").where("id", "==", data.id).limit(1).get();
+    if (!conflictSnap.empty) {
+      throw new HttpsError("already-exists", `A user with ID ${data.id} already exists.`);
+    }
     // @ts-ignore
     userData.createdAt = admin.firestore.FieldValue.serverTimestamp();
   }
-  
+
   await userRef.set(userData, {merge: true});
 
   return {ok: true, id: data.id};
@@ -67,21 +67,21 @@ export const adminUpsertUser = onCall({cors: true}, async (req) => {
 // --- Callable: adminDeleteUser ---
 type DeleteUserPayload = { id: string };
 export const adminDeleteUser = onCall({cors: true}, async (req) => {
-    requireRole(req, ['admin']); // Only admins can hard delete
-    const data = req.data as DeleteUserPayload;
-    if (!data.id) throw new HttpsError("invalid-argument", "ID is required.");
-    
-    // Deleting the user, their secret, and their auth account
-    const batch = db.batch();
-    batch.delete(db.collection('users').doc(data.id));
-    batch.delete(db.collection('user_secrets').doc(data.id));
-    
-    await Promise.all([
-        batch.commit(),
-        admin.auth().deleteUser(data.id).catch(e => console.warn(`Auth user ${data.id} not found, continuing.`))
-    ]);
+  requireRole(req, ["admin"]); // Only admins can hard delete
+  const data = req.data as DeleteUserPayload;
+  if (!data.id) throw new HttpsError("invalid-argument", "ID is required.");
 
-    return { ok: true, id: data.id };
+  // Deleting the user, their secret, and their auth account
+  const batch = db.batch();
+  batch.delete(db.collection("users").doc(data.id));
+  batch.delete(db.collection("user_secrets").doc(data.id));
+
+  await Promise.all([
+    batch.commit(),
+    admin.auth().deleteUser(data.id).catch((e) => console.warn(`Auth user ${data.id} not found, continuing.`)),
+  ]);
+
+  return {ok: true, id: data.id};
 });
 
 
@@ -97,13 +97,13 @@ export const adminSetUserPin = onCall({cors: true}, async (req) => {
   if (typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
     throw new HttpsError("invalid-argument", "A 4-digit pin is required.");
   }
-  
+
   const pinHash = await bcrypt.hash(pin, 10);
-  
+
   await db.collection("user_secrets").doc(id).set({
     pinHash,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  }, { merge: true });
+  }, {merge: true});
 
   return {ok: true};
 });

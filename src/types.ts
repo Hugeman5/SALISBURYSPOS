@@ -91,7 +91,7 @@ export type CashMovement = {
   id: string;
   createdAt: Timestamp;
   by: { uid: string; name: string };
-  type: "payin" | "payout" | "adjustment";
+  type: "payin" | "payout";
   amount: number; // positive for IN, negative for OUT
   reason: string;
 };
@@ -108,3 +108,5 @@ export type ZClosure = {
   perRegister: { [key: string]: { sessions: number; cashMovementsTotal: number; overShort: number } };
   notes?: string;
 };
+
+    

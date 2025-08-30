@@ -14,7 +14,11 @@ export {
 } from "./products";
 
 // Users
-export {adminSetUserPin} from "./users";
+export {
+  adminUpsertUser,
+  adminDeleteUser,
+  adminSetUserPin
+} from "./users";
 
 // Inventory
 export {
@@ -35,4 +39,10 @@ export {
 // Reports
 export {adminCloseDay, adminExportZCsv} from "./reports";
 
+// Timeclock
 export {clockIn, clockOut, adminExportTimeCsv} from "./timeclock";
+
+// Cash Register
+export { manageRegisterSession, postCashMovement } from "./cash-register";
+
+    
