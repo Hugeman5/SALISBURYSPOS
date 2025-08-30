@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3110 --hostname 0.0.0.0",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start -p 3111",
     "lint": "next lint",
@@ -66,7 +66,6 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@types/uuid": "^10.0.0",
-    "bcryptjs": "^2.4.3",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.5",
     "genkit-cli": "^1.14.1",

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { create } from 'zustand';
@@ -19,6 +20,7 @@ type AuthState = {
   role: Role | null;
   loading: boolean;
   lastError: string | null;
+  hydrated: boolean;
   loginWithPin: (idOrUid: string, pin: string) => Promise<boolean>;
   logout: () => Promise<void>;
   setFromFirebase: (fb: FbUser | null) => void;
@@ -31,6 +33,7 @@ export const useAuth = create<AuthState>()(
       role: null,
       loading: false,
       lastError: null,
+      hydrated: false,
 
       async loginWithPin(idOrUid: string, pin: string) {
         if (get().loading) return false; // prevent concurrent requests
@@ -44,7 +47,7 @@ export const useAuth = create<AuthState>()(
           });
 
           if (!res.ok) {
-            let msg = `${res.status}`;
+            let msg = `${res.statusText}`;
             try { const j = await res.json(); msg = j.error || msg; } catch {}
             set({ lastError: msg });
             console.error('PIN login failed:', msg);
@@ -96,7 +99,10 @@ export const useAuth = create<AuthState>()(
     {
       name: 'salisburyspos-auth',
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ profile: s.profile, role: s.role })
+      partialize: (s) => ({ profile: s.profile, role: s.role }),
+       onRehydrateStorage: () => (state) => {
+        if (state) state.hydrated = true;
+      },
     }
   )
 );

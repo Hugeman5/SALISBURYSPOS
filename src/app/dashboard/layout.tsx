@@ -1,3 +1,4 @@
+
 'use client';
 import { ReactNode, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -13,8 +14,11 @@ function DashboardGuard({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
-      if (!u) router.replace('/login');
-      else setReady(true);
+      if (!u) {
+        router.replace('/login');
+      } else {
+        setReady(true);
+      }
     });
     return () => unsub();
   }, [router]);

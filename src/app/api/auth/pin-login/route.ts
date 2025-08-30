@@ -1,3 +1,4 @@
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
 
     const ok = await bcrypt.compare(pin, secret.pinHash);
     if (!ok) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid PIN' }, { status: 401 });
     }
     
     // Ensure Auth user exists for token creation
@@ -72,6 +73,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ token, role, uid });
   } catch (e: any) {
     console.error('pin-login error:', e);
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -13,7 +13,7 @@ export async function GET() {
     // Check secret existence per user (cheap doc exists check)
     const checks = usersSnap.docs.map(async d => {
       const id = d.id;
-      const s = await adminDb.collection('userSecrets').doc(id).get();
+      const s = await adminDb.collection('user_secrets').doc(id).get();
       if (s.exists && s.data()?.pinHash) {
         const { name, role } = d.data() as any;
         results.push({ id, name, role });
