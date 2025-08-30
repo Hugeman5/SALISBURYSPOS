@@ -4,7 +4,7 @@
 
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import {db, requireRole, Role} from "./utils";
+import {db, requireRole} from "./utils";
 
 /**
  * Manages cash register sessions (opening and closing).

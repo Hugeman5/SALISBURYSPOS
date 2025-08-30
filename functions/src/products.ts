@@ -176,7 +176,7 @@ export const adminBulkImportProducts = onCall({cors: true}, async (req) => {
   const head = header.split(",").map((s) => s.trim().toLowerCase());
   const idx = (k: string) => head.indexOf(k);
 
-  const iName = idx("name"), iSku = idx("sku"), iInc = idx("priceinczar");
+  const iName = idx("name"); const iSku = idx("sku"); const iInc = idx("priceinczar");
   if (iName<0 || iSku<0 || iInc<0) {
     throw new HttpsError("invalid-argument", "CSV needs name,sku,priceIncZAR");
   }

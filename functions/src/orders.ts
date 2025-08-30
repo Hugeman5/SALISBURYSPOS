@@ -76,7 +76,7 @@ export const cashierSetItems = onCall({cors: true}, async (req) => {
   const productIds = [...new Set(cartItems.map((i) => i.productId))];
   const productsById = await getProductsByIds(productIds);
 
-  let subEx=0, vat=0, inc=0;
+  let subEx=0; let vat=0; let inc=0;
   const orderItems = cartItems.map((ci) => {
     const p = productsById.get(ci.productId);
     if (!p) throw new HttpsError("not-found", `Product ${ci.productId} not found`);

@@ -13,7 +13,7 @@ import {db, requireRole} from "./utils";
  * @return {{startMs: number, endMs: number, key: string}} The time window.
  */
 function saDayWindow(dateStr?: string) {
-  let y: number, m: number, d: number;
+  let y: number; let m: number; let d: number;
 
   if (dateStr) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
