@@ -11,8 +11,10 @@ export async function GET(req: NextRequest) {
     const uid = searchParams.get('uid');
 
     if (!uid) {
-        const snap = await adminDb.collection('users').limit(1).get();
-        return NextResponse.json({ ok: true, usersCountHint: snap.size, message: "Provide a 'uid' query parameter to check a specific user." });
+      return NextResponse.json({ 
+        ok: true, 
+        message: "Provide a 'uid' query parameter to check a specific user. Example: /api/diag/user?uid=admin" 
+      });
     }
     
     const userDoc = await adminDb.collection('users').doc(uid).get();
@@ -21,18 +23,23 @@ export async function GET(req: NextRequest) {
     const user = userDoc.exists ? userDoc.data() : null;
     const secret = secretDoc.exists ? secretDoc.data() : null;
 
+    const pinHash = (secret as any)?.pinHash;
+
     return NextResponse.json({
       ok: true,
       uid: uid,
-      userExists: userDoc.exists,
-      secretExists: secretDoc.exists,
-      active: user?.active ?? null,
-      hasPin: !!(secret && (secret as any).pinHash),
-      role: user?.role ?? null,
+      checks: {
+        userProfileFound: userDoc.exists,
+        userIsActive: !!user?.active,
+        userSecretFound: secretDoc.exists,
+        pinHashIsSet: !!pinHash && typeof pinHash === 'string' && pinHash.length > 20,
+      },
+      userData: user,
+      secretData: secret ? { hasPinHash: !!pinHash } : null,
     });
 
   } catch (e: any) {
-    console.error('diag fail:', e);
+    console.error(`[diag/user] Error for uid=${uid}:`, e);
     return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
   }
 }
