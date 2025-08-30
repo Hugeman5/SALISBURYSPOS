@@ -15,7 +15,8 @@ export default function LoginPage() {
   const [users, setUsers] = useState<LoginableUser[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [pin, setPin] = useState('');
-  
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+
   // Redirect if already logged in
   useEffect(() => {
     if(profile) {
@@ -24,7 +25,7 @@ export default function LoginPage() {
     }
   },[profile, router]);
 
-  // Fetch users who have a PIN set
+  // Fetch users who have a PIN set from the secure API endpoint
   useEffect(() => {
     async function fetchUsers() {
         try {
@@ -39,6 +40,21 @@ export default function LoginPage() {
     fetchUsers();
   }, []);
 
+  // Debounced auto-submit when PIN length hits 4
+  useEffect(() => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    if (pin.length === 4 && selectedId) {
+      debounceTimer.current = setTimeout(async () => {
+        const ok = await loginWithPin(selectedId, pin);
+        if (!ok) {
+          setTimeout(() => setPin(''), 500); // Clear PIN on failure after shake animation
+        }
+      }, 250);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin, selectedId]);
+
+
   const handleLogin = async () => {
     if (!selectedId || pin.length < 4) return;
     const ok = await loginWithPin(selectedId, pin);
@@ -46,7 +62,7 @@ export default function LoginPage() {
       setTimeout(() => setPin(''), 500); // Clear PIN on failure after shake animation
     }
   };
-  
+
   const selectedUser = users.find(u => u.id === selectedId);
 
   return (
@@ -81,7 +97,7 @@ export default function LoginPage() {
                      <div className="min-h-[20px] mb-2 text-sm text-destructive" aria-live="polite">
                         {lastError}
                     </div>
-                    <PinKeypad 
+                    <PinKeypad
                         pin={pin}
                         onPinChange={setPin}
                         onSubmit={handleLogin}
