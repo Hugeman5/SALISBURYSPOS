@@ -3,12 +3,13 @@
  * @fileoverview User and authentication management functions.
  */
 
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as bcrypt from "bcryptjs";
-import { z } from "zod";
-import { db, requireRole, Role } from "./utils";
+import {z} from "zod";
+import {db, requireRole} from "./utils";
+import type {Role} from "./utils";
 
 const UpsertUserPayloadSchema = z.object({
   id: z.string().optional(),
@@ -24,7 +25,7 @@ const UpsertUserPayloadSchema = z.object({
  * @param {object} req The request object.
  * @return {Promise<{ok: true, id: string}>} A promise that resolves on success.
  */
-export const adminUpsertUser = onCall({ cors: true }, async (req) => {
+export const adminUpsertUser = onCall({cors: true}, async (req) => {
   const actorRole = requireRole(req, ["admin", "manager"]);
   const result = UpsertUserPayloadSchema.safeParse(req.data);
   if (!result.success) {
@@ -69,7 +70,7 @@ export const adminUpsertUser = onCall({ cors: true }, async (req) => {
     await userRef.update(userData);
   }
 
-  return { ok: true, id: userId };
+  return {ok: true, id: userId};
 });
 
 /**
@@ -78,9 +79,9 @@ export const adminUpsertUser = onCall({ cors: true }, async (req) => {
  * @param {object} req The request object.
  * @return {Promise<{ok: true, id: string}>} A promise that resolves on success.
  */
-export const adminDeleteUser = onCall({ cors: true }, async (req) => {
+export const adminDeleteUser = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin"]);
-  const { id } = z.object({ id: z.string().min(1) }).parse(req.data);
+  const {id} = z.object({id: z.string().min(1)}).parse(req.data);
 
   const batch = db.batch();
   batch.delete(db.collection("users").doc(id));
@@ -95,12 +96,12 @@ export const adminDeleteUser = onCall({ cors: true }, async (req) => {
     }),
   ]);
 
-  return { ok: true, id };
+  return {ok: true, id};
 });
 
 const SetPinPayloadSchema = z.object({
-    id: z.string().min(1),
-    pin: z.string().regex(/^\d{4}$/),
+  id: z.string().min(1),
+  pin: z.string().regex(/^\d{4}$/),
 });
 
 /**
@@ -108,16 +109,16 @@ const SetPinPayloadSchema = z.object({
  * @param {object} req The request object.
  * @return {Promise<{ok: true}>} A promise that resolves on success.
  */
-export const adminSetUserPin = onCall({ cors: true }, async (req) => {
+export const adminSetUserPin = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
-  const { id, pin } = SetPinPayloadSchema.parse(req.data);
+  const {id, pin} = SetPinPayloadSchema.parse(req.data);
 
   const pinHash = await bcrypt.hash(pin, 10);
 
   await db.collection("user_secrets").doc(id).set({
     pinHash,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  }, { merge: true });
+  }, {merge: true});
 
-  return { ok: true };
+  return {ok: true};
 });
