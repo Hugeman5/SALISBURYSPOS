@@ -1,3 +1,4 @@
+
 {
   "indexes": [
     {
@@ -6,13 +7,11 @@
       "fields": [
         {
           "fieldPath": "productId",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         },
         {
           "fieldPath": "ts",
-          "order": "DESCENDING",
-          "arrayConfig": null
+          "order": "DESCENDING"
         }
       ]
     },
@@ -22,13 +21,11 @@
       "fields": [
         {
           "fieldPath": "ts",
-          "order": "DESCENDING",
-          "arrayConfig": null
+          "order": "DESCENDING"
         },
         {
           "fieldPath": "type",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         }
       ]
     },
@@ -38,13 +35,11 @@
       "fields": [
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING",
-          "arrayConfig": null
+          "order": "DESCENDING"
         },
         {
           "fieldPath": "status",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         }
       ]
     },
@@ -54,18 +49,15 @@
       "fields": [
         {
           "fieldPath": "active",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         },
         {
           "fieldPath": "categoryId",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         },
         {
           "fieldPath": "name",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         }
       ]
     },
@@ -75,13 +67,11 @@
       "fields": [
         {
           "fieldPath": "active",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         },
         {
           "fieldPath": "name",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         }
       ]
     },
@@ -91,45 +81,11 @@
       "fields": [
         {
           "fieldPath": "inAt",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         },
         {
           "fieldPath": "outAt",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        }
-      ]
-    },
-    {
-      "collectionGroup": "time_clock",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "inAt",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "outAt",
-          "order": "ASCENDING",
-          "arrayConfig": null
-        }
-      ]
-    },
-    {
-      "collectionGroup": "time_clock",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "inAt",
-          "order": "DESCENDING",
-          "arrayConfig": null
-        },
-        {
-          "fieldPath": "outAt",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         }
       ]
     },
@@ -139,18 +95,15 @@
       "fields": [
         {
           "fieldPath": "__name__",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         },
         {
           "fieldPath": "inAt",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         },
         {
           "fieldPath": "outAt",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         }
       ]
     },
@@ -160,18 +113,15 @@
       "fields": [
         {
           "fieldPath": "__name__",
-          "order": "DESCENDING",
-          "arrayConfig": null
+          "order": "DESCENDING"
         },
         {
           "fieldPath": "inAt",
-          "order": "DESCENDING",
-          "arrayConfig": null
+          "order": "DESCENDING"
         },
         {
           "fieldPath": "outAt",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         }
       ]
     },
@@ -181,18 +131,15 @@
       "fields": [
         {
           "fieldPath": "__name__",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         },
         {
           "fieldPath": "active",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         },
         {
           "fieldPath": "name",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         }
       ]
     },
@@ -202,18 +149,15 @@
       "fields": [
         {
           "fieldPath": "active",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         },
         {
           "fieldPath": "name",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         },
         {
           "fieldPath": "role",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         }
       ]
     },
@@ -223,13 +167,39 @@
       "fields": [
         {
           "fieldPath": "active",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
         },
         {
           "fieldPath": "name",
-          "order": "ASCENDING",
-          "arrayConfig": null
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "time_clock",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "inAt",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "outAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "time_clock",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "inAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "outAt",
+          "order": "ASCENDING"
         }
       ]
     }
