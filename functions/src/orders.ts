@@ -1,35 +1,83 @@
-
-import {onCall} from "firebase-functions/v2/https";
+import { onCall, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import {z} from "zod";
-import {format} from "date-fns";
+import { z } from "zod";
+import { format } from "date-fns";
 
+// ---------- Admin init (idempotent) ----------
+if (!admin.apps.length) admin.initializeApp();
+const db = admin.firestore();
+
+// ---------- Auth helpers ----------
 type Role = "admin" | "manager" | "cashier" | "waiter" | "kitchen";
-
-function requireRole(context: any, allowed: Role[]) {
-  const role = context?.auth?.token?.role as Role | undefined;
-  if (!role || !allowed.includes(role)) throw new Error("PERMISSION_DENIED");
+function requireRole(req: CallableRequest, allowed: Role[]) {
+  if (!req.auth) throw new HttpsError("unauthenticated", "Sign-in required.");
+  const role = (req.auth.token as any)?.role as Role | undefined;
+  if (!role || !allowed.includes(role)) {
+    throw new HttpsError("permission-denied", "Insufficient permissions.");
+  }
   return role;
 }
 
-const db = admin.firestore();
+// ---------- Money / VAT (all amounts in cents) ----------
 const VAT_RATE = 0.15;
+// Split a VAT-inclusive cent amount into excl+vat (integer math, rounded to cents)
+function splitVat(inclCents: number) {
+  const excl = Math.round(inclCents / (1 + VAT_RATE));
+  const vat = inclCents - excl;
+  return { excl, vat };
+}
 
-const splitVat = (incl: number) => {
-  const excl = Math.round(incl / (1 + VAT_RATE));
-  const vat = incl - excl;
-  return {excl, vat};
-};
-
-// Zod schemas for validation
-const createOrderSchema = z.object({
-  note: z.string().optional(),
+// ---------- Zod Schemas ----------
+const createOrderSchema = z.object({ note: z.string().optional() });
+const setItemsSchema = z.object({
+  orderId: z.string(),
+  items: z.array(z.object({ productId: z.string(), qty: z.number().int().gt(0) })).min(1),
 });
-export const cashierCreateOrder = onCall({cors: true}, async (req) => {
+const takePaymentSchema = z.object({
+  orderId: z.string(),
+  type: z.enum(["cash", "card"]),
+  amount: z.number().int().gt(0),
+});
+const closeOrderSchema = z.object({ orderId: z.string() });
+const salesSummarySchema = z.object({
+  fromISO: z.string().datetime(),
+  toISO: z.string().datetime(),
+});
+
+// ---------- Utils ----------
+async function getProductsByIds(ids: string[]) {
+  // Firestore "in" supports up to 10 values. Chunk it.
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10));
+
+  const results = await Promise.all(
+    chunks.map((c) =>
+      db
+        .collection("products")
+        .where(admin.firestore.FieldPath.documentId(), "in", c)
+        .get()
+    )
+  );
+
+  const out = new Map<string, FirebaseFirestore.DocumentData>();
+  for (const snap of results) {
+    for (const doc of snap.docs) out.set(doc.id, doc.data());
+  }
+  return out;
+}
+
+// ===================================================================
+// Create order (open)
+// ===================================================================
+export const cashierCreateOrder = onCall({ cors: true }, async (req) => {
   requireRole(req, ["admin", "manager", "cashier"]);
   const cashierId = req.auth!.uid;
-  const cashierName = req.auth!.token.name || "Unknown";
-  const {note} = createOrderSchema.parse(req.data);
+  const cashierName =
+    (req.auth!.token as any)?.name ||
+    (req.auth!.token as any)?.email ||
+    "Unknown";
+
+  const { note } = createOrderSchema.parse(req.data);
 
   const orderRef = db.collection("orders").doc();
   await orderRef.set({
@@ -37,95 +85,75 @@ export const cashierCreateOrder = onCall({cors: true}, async (req) => {
     createdBy: cashierId,
     cashierName,
     items: [],
-    totals: {
-      subTotalEx: 0,
-      vat: 0,
-      totalInc: 0,
-    },
+    totals: { subTotalEx: 0, vat: 0, totalInc: 0 },
     payments: [],
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     currency: "ZAR",
     vatRate: VAT_RATE,
-    note: note || null,
+    note: note ?? null,
   });
 
-  return {orderId: orderRef.id};
+  return { ok: true, orderId: orderRef.id };
 });
 
-const setItemsSchema = z.object({
-  orderId: z.string(),
-  items: z.array(z.object({
-    productId: z.string(),
-    qty: z.number().int().gt(0),
-  })),
-});
-export const cashierSetItems = onCall({cors: true}, async (req) => {
+// ===================================================================
+// Set/replace items (recalculate totals from product.price.incCents)
+// ===================================================================
+export const cashierSetItems = onCall({ cors: true }, async (req) => {
   requireRole(req, ["admin", "manager", "cashier"]);
-  const {orderId, items: cartItems} = setItemsSchema.parse(req.data);
-  const orderRef = db.collection("orders").doc(orderId);
+  const { orderId, items: cartItems } = setItemsSchema.parse(req.data);
 
-  const productIds = [...new Set(cartItems.map((item) => item.productId))];
-  const productSnapshots = await db.collection("products").where(admin.firestore.FieldPath.documentId(), "in", productIds).get();
-  const productsById = new Map(productSnapshots.docs.map((doc) => [doc.id, doc.data()]));
+  // Load products in chunks of 10
+  const productIds = [...new Set(cartItems.map((i) => i.productId))];
+  const productsById = await getProductsByIds(productIds);
 
-  let totalSubTotalEx = 0;
-  let totalVat = 0;
-  let totalInc = 0;
+  let subEx = 0,
+    vat = 0,
+    inc = 0;
 
-  const orderItems = cartItems.map((cartItem) => {
-    const product = productsById.get(cartItem.productId);
-    if (!product) throw new Error(`Product ${cartItem.productId} not found`);
+  const orderItems = cartItems.map((ci) => {
+    const product = productsById.get(ci.productId);
+    if (!product) throw new HttpsError("not-found", `Product ${ci.productId} not found`);
+    const priceInc = Number(product?.price?.incCents);
+    const vatRate = Number(product?.price?.taxRate ?? VAT_RATE);
+    if (!Number.isFinite(priceInc) || priceInc < 0) {
+      throw new HttpsError("failed-precondition", `Invalid price for ${ci.productId}`);
+    }
 
-    const priceInc = product.price.incCents;
-    const vatRate = product.price.taxRate;
+    const lineInc = priceInc * ci.qty;
+    const { excl: lineEx, vat: lineVat } = splitVat(lineInc);
 
-    const lineTotalInc = priceInc * cartItem.qty;
-    const {excl: lineSubExcl, vat: lineVat} = splitVat(lineTotalInc);
-
-    totalSubTotalEx += lineSubExcl;
-    totalVat += lineVat;
-    totalInc += lineTotalInc;
+    subEx += lineEx;
+    vat += lineVat;
+    inc += lineInc;
 
     return {
-      productId: cartItem.productId,
-      name: product.name,
-      qty: cartItem.qty,
+      productId: ci.productId,
+      name: String(product.name ?? ""),
+      qty: ci.qty,
       priceEx: splitVat(priceInc).excl,
       vatRate,
-      lineTotalEx: lineSubExcl,
+      lineTotalEx: lineEx,
       vatAmount: lineVat,
-      lineTotalInc,
+      lineTotalInc: lineInc,
     };
   });
 
-  await orderRef.update({
+  await db.collection("orders").doc(orderId).update({
     items: orderItems,
-    totals: {
-      subTotalEx: totalSubTotalEx,
-      vat: totalVat,
-      totalInc,
-    },
+    totals: { subTotalEx: subEx, vat, totalInc: inc },
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  return {
-    ok: true,
-    totals: {
-      subTotalEx: totalSubTotalEx,
-      vat: totalVat,
-      totalInc,
-    },
-  };
+  return { ok: true, totals: { subTotalEx: subEx, vat, totalInc: inc } };
 });
 
-const takePaymentSchema = z.object({
-  orderId: z.string(),
-  type: z.enum(["cash", "card"]),
-  amount: z.number().int().gt(0),
-});
-export const cashierTakePayment = onCall({cors: true}, async (req) => {
+// ===================================================================
+// Take a payment (cash/card) – appends to payments[]
+// ===================================================================
+export const cashierTakePayment = onCall({ cors: true }, async (req) => {
   requireRole(req, ["admin", "manager", "cashier"]);
-  const {orderId, type, amount} = takePaymentSchema.parse(req.data);
-  const orderRef = db.collection("orders").doc(orderId);
+  const { orderId, type, amount } = takePaymentSchema.parse(req.data);
 
   const payment = {
     type,
@@ -133,87 +161,103 @@ export const cashierTakePayment = onCall({cors: true}, async (req) => {
     ts: admin.firestore.FieldValue.serverTimestamp(),
   };
 
-  await orderRef.update({
-    payments: admin.firestore.FieldValue.arrayUnion(payment),
-  });
-  return {ok: true};
+  await db
+    .collection("orders")
+    .doc(orderId)
+    .update({ payments: admin.firestore.FieldValue.arrayUnion(payment) });
+
+  return { ok: true };
 });
 
-const closeOrderSchema = z.object({orderId: z.string()});
-export const cashierCloseOrder = onCall({cors: true}, async (req) => {
+// ===================================================================
+// Close order (ensure paid, write inventory movements, mark paid)
+// ===================================================================
+export const cashierCloseOrder = onCall({ cors: true }, async (req) => {
   requireRole(req, ["admin", "manager", "cashier"]);
-  const {orderId} = closeOrderSchema.parse(req.data);
+  const { orderId } = closeOrderSchema.parse(req.data);
+
   const orderRef = db.collection("orders").doc(orderId);
-  const orderSnap = await orderRef.get();
-  if (!orderSnap.exists) throw new Error("Order not found");
-  const order = orderSnap.data()!;
-
-  const totalPaid = order.payments.reduce((sum: number, p: any) => sum + p.amount, 0);
-  if (totalPaid < order.totals.totalInc) {
-    throw new Error("Insufficient payment");
-  }
-
-  const stockMovements = order.items.map((item: any) => ({
-    productId: item.productId,
-    type: "sale",
-    qty: item.qty,
-    note: `Order ${orderId}`,
-    clientTxnId: `sale:${orderId}:${item.productId}`,
-  }));
-
-  const ledgerCol = db.collection("inventory_ledger");
   const productCol = db.collection("products");
-  const batch = db.batch();
+  const ledgerCol = db.collection("inventory_ledger");
 
-  for (const movement of stockMovements) {
-    const pSnap = await productCol.doc(movement.productId).get();
-    const product = pSnap.data();
-    if (!product || !product.trackStock) continue;
+  // Do consistency work in a transaction to reduce race conditions
+  await db.runTransaction(async (tx) => {
+    const orderSnap = await tx.get(orderRef);
+    if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found");
+    const order = orderSnap.data() as any;
 
-    const before = product.stockOnHand || 0;
-    const delta = -movement.qty;
-    const after = before + delta;
+    if (order.status === "paid") return; // idempotent
 
-    if (after < 0) {
-      // Allow overselling but log it. A better system might block this.
-      console.warn(`Overselling product ${movement.productId}. Stock is now ${after}`);
+    const items: any[] = Array.isArray(order.items) ? order.items : [];
+    const payments: any[] = Array.isArray(order.payments) ? order.payments : [];
+    const totals = order.totals || { totalInc: 0 };
+
+    const totalPaid = payments.reduce((s, p) => s + Number(p?.amount || 0), 0);
+    if (totalPaid < Number(totals.totalInc || 0)) {
+      throw new HttpsError("failed-precondition", "Insufficient payment");
     }
 
-    const ledgerRef = ledgerCol.doc();
-    batch.set(ledgerRef, {
-      ...movement,
-      delta,
-      before,
-      after,
-      userId: req.auth!.uid,
-      userName: req.auth!.token.name,
-      ts: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    batch.update(pSnap.ref, {stockOnHand: after});
-  }
+    // For each item: reduce stock and write ledger
+    for (const item of items) {
+      const pRef = productCol.doc(item.productId);
+      const pSnap = await tx.get(pRef);
+      const product = pSnap.data();
+      if (!product || !product.trackStock) continue;
 
-  batch.update(orderRef, {
-    status: "paid",
-    closedAt: admin.firestore.FieldValue.serverTimestamp(),
+      const before = Number(product.stockOnHand || 0);
+      const delta = -Number(item.qty || 0);
+      const after = before + delta;
+
+      // Allow oversell but record it (optional: throw instead)
+      // if (after < 0) throw new HttpsError("failed-precondition", "Stock would go negative");
+
+      const ledgerRef = ledgerCol.doc();
+      tx.set(ledgerRef, {
+        productId: item.productId,
+        productSku: product.sku || "",
+        productName: product.name || "",
+        type: "sale",
+        qty: item.qty,
+        delta,
+        before,
+        after,
+        note: `Order ${orderId}`,
+        clientTxnId: `sale:${orderId}:${item.productId}`,
+        userId: req.auth!.uid,
+        userName:
+          (req.auth!.token as any)?.name ||
+          (req.auth!.token as any)?.email ||
+          req.auth!.uid,
+        ts: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      tx.update(pRef, { stockOnHand: after, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    }
+
+    tx.update(orderRef, {
+      status: "paid",
+      closedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
   });
 
-  await batch.commit();
-
-  return {ok: true};
+  return { ok: true };
 });
 
-const salesSummarySchema = z.object({
-  fromISO: z.string().datetime(),
-  toISO: z.string().datetime(),
-});
-export const getSalesSummary = onCall({cors: true}, async (req) => {
+// ===================================================================
+// Sales summary (paid orders within a range)
+// ===================================================================
+export const getSalesSummary = onCall({ cors: true }, async (req) => {
   requireRole(req, ["admin", "manager", "cashier"]);
-  const {fromISO, toISO} = salesSummarySchema.parse(req.data);
+  const { fromISO, toISO } = salesSummarySchema.parse(req.data);
 
-  const q = db.collection("orders")
+  // Requires composite index: (status ASC, closedAt DESC)
+  let q = db
+    .collection("orders")
     .where("status", "==", "paid")
     .where("closedAt", ">=", new Date(fromISO))
-    .where("closedAt", "<=", new Date(toISO));
+    .where("closedAt", "<=", new Date(toISO))
+    .orderBy("closedAt", "desc");
 
   const snap = await q.get();
   if (snap.empty) {
@@ -222,7 +266,7 @@ export const getSalesSummary = onCall({cors: true}, async (req) => {
       grossTotalIncl: 0,
       subTotalExcl: 0,
       vatTotal: 0,
-      paymentsByMethod: {cash: 0, card: 0},
+      paymentsByMethod: { cash: 0, card: 0 },
       avgOrderValue: 0,
     };
   }
@@ -230,17 +274,17 @@ export const getSalesSummary = onCall({cors: true}, async (req) => {
   let grossTotalIncl = 0;
   let subTotalExcl = 0;
   let vatTotal = 0;
-  const paymentsByMethod = {cash: 0, card: 0};
+  const paymentsByMethod = { cash: 0, card: 0 };
 
-  snap.forEach((doc) => {
-    const order = doc.data();
-    grossTotalIncl += order.totals.totalInc || 0;
-    subTotalExcl += order.totals.subTotalEx || 0;
-    vatTotal += order.totals.vat || 0;
-    order.payments.forEach((p: any) => {
-      if (p.type === "cash") paymentsByMethod.cash += p.amount;
-      if (p.type === "card") paymentsByMethod.card += p.amount;
-    });
+  snap.forEach((d) => {
+    const o = d.data() as any;
+    grossTotalIncl += Number(o?.totals?.totalInc || 0);
+    subTotalExcl += Number(o?.totals?.subTotalEx || 0);
+    vatTotal += Number(o?.totals?.vat || 0);
+    for (const p of o?.payments || []) {
+      if (p?.type === "cash") paymentsByMethod.cash += Number(p?.amount || 0);
+      if (p?.type === "card") paymentsByMethod.card += Number(p?.amount || 0);
+    }
   });
 
   return {
@@ -253,11 +297,16 @@ export const getSalesSummary = onCall({cors: true}, async (req) => {
   };
 });
 
-export const adminExportOrders = onCall({cors: true}, async (req) => {
+// ===================================================================
+// Admin export of paid orders to CSV (within date range)
+// ===================================================================
+export const adminExportOrders = onCall({ cors: true }, async (req) => {
   requireRole(req, ["admin", "manager"]);
-  const {fromISO, toISO} = salesSummarySchema.parse(req.data);
+  const { fromISO, toISO } = salesSummarySchema.parse(req.data);
 
-  const q = db.collection("orders")
+  // Same composite index as above.
+  const q = db
+    .collection("orders")
     .where("status", "==", "paid")
     .where("closedAt", ">=", new Date(fromISO))
     .where("closedAt", "<=", new Date(toISO))
@@ -265,25 +314,34 @@ export const adminExportOrders = onCall({cors: true}, async (req) => {
 
   const snap = await q.get();
 
-  const rows = [
+  const rows: string[] = [
     "orderId,createdAt,status,cashierName,subTotalExcl,vatTotal,totalIncl,paymentsTotal,changeDue",
   ];
 
   for (const d of snap.docs) {
-    const o = d.data();
-    const paymentsTotal = o.payments.reduce((sum: number, p: any) => sum + p.amount, 0);
-    const changeDue = Math.max(0, paymentsTotal - o.totals.totalInc);
-    rows.push([
-      d.id,
-      o.createdAt.toDate().toISOString(),
-      o.status,
-      `"${(o.cashierName || "").replace(/"/g, "\"\"")}"`,
-      (o.totals.subTotalEx / 100).toFixed(2),
-      (o.totals.vat / 100).toFixed(2),
-      (o.totals.totalInc / 100).toFixed(2),
-      (paymentsTotal / 100).toFixed(2),
-      (changeDue / 100).toFixed(2),
-    ].join(","));
+    const o = d.data() as any;
+    const createdAtISO = o?.createdAt?.toDate?.() ? o.createdAt.toDate().toISOString() : "";
+    const subEx = Number(o?.totals?.subTotalEx || 0);
+    const vat = Number(o?.totals?.vat || 0);
+    const inc = Number(o?.totals?.totalInc || 0);
+    const paymentsTotal = (o?.payments || []).reduce((s: number, p: any) => s + Number(p?.amount || 0), 0);
+    const changeDue = Math.max(0, paymentsTotal - inc);
+
+    const esc = (s: string | null | undefined) => `"${String(s ?? "").replace(/"/g, '""')}"`;
+
+    rows.push(
+      [
+        d.id,
+        createdAtISO,
+        o?.status || "",
+        esc(o?.cashierName),
+        (subEx / 100).toFixed(2),
+        (vat / 100).toFixed(2),
+        (inc / 100).toFixed(2),
+        (paymentsTotal / 100).toFixed(2),
+        (changeDue / 100).toFixed(2),
+      ].join(",")
+    );
   }
 
   const csv = rows.join("\n");

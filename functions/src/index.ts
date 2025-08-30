@@ -17,7 +17,7 @@ export {
 export {
   adminUpsertUser,
   adminDeleteUser,
-  adminSetUserPin
+  adminSetUserPin,
 } from "./users";
 
 // Inventory
@@ -43,6 +43,5 @@ export {adminCloseDay, adminExportZCsv} from "./reports";
 export {clockIn, clockOut, adminExportTimeCsv} from "./timeclock";
 
 // Cash Register
-export { manageRegisterSession, postCashMovement } from "./cash-register";
+export {manageRegisterSession, postCashMovement} from "./cash-register";
 
-    
