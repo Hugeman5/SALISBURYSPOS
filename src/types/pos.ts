@@ -23,11 +23,12 @@ export interface OrderItem {
   lineTotalEx: number;
   vatAmount: number;
   lineTotalInc: number;
+  priceInc?: number;
 }
 
 export interface Payment {
   type: "cash" | "card";
-  amount: number;
+  amount: number; // in cents
   ref?: string;
   ts: Timestamp;
 }
@@ -64,7 +65,7 @@ export interface CartLineItem {
 export interface RefundItem {
     productId: string;
     qty: number;
-    priceInc: number;
+    priceInc: number; // in cents
     name: string;
 }
 

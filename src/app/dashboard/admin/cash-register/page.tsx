@@ -2,7 +2,7 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, limit, where } from 'firebase/firestore';
 import { useAuth } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,19 +32,16 @@ export default function CashRegisterPage() {
 
     useEffect(() => {
         setLoading(true);
-        const qRegisters = query(collection(db, 'registers'), orderBy('name'));
-        const unsubRegisters = onSnapshot(qRegisters, (snap) => {
-            setRegisters(snap.docs.map(d => ({ id: d.id, ...d.data() } as Register)));
-            setLoading(false);
-        });
+        // A real app might have a 'registers' collection, but for now we'll fake one for the modal.
+        setRegisters([{ id: 'REG-1', name: 'Main Register', active: true }]);
 
         const qSessions = query(collection(db, 'register_sessions'), orderBy('openedAt', 'desc'), limit(10));
         const unsubSessions = onSnapshot(qSessions, (snap) => {
             setSessions(snap.docs.map(d => ({ id: d.id, ...d.data() } as RegisterSession)));
+            setLoading(false);
         });
         
         return () => {
-            unsubRegisters();
             unsubSessions();
         };
     }, []);
@@ -75,8 +72,11 @@ export default function CashRegisterPage() {
             return;
         }
         try {
-            await call('manageRegisterSession', { action: 'close', sessionId: openSession.id, countedCash: counted * 100 });
-            toast({ title: "Register session closed successfully." });
+            const result = await call('manageRegisterSession', { action: 'close', sessionId: openSession.id, countedCash: counted * 100 });
+            toast({ 
+                title: "Register session closed",
+                description: `Variance (Over/Short): ${fmtZAR(result.overShort)}`
+            });
         } catch (error: any) {
             toast({ variant: "destructive", title: "Failed to close session", description: error.message });
         }

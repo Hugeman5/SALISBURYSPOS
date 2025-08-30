@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CartLineItem, Payment } from '@/types/pos';
+import { useCartStore } from '@/stores/cart-store';
+import type { Payment } from '@/types/pos';
 import { fmtZAR, parseToCents } from '@/utils/money';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -22,23 +23,28 @@ import { call } from '@/lib/functions/call';
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
-  cart: CartLineItem[];
-  totals: { subTotalEx: number; vat: number; totalInc: number };
   cashierId: string;
   cashierName: string;
-  onSuccess: () => void;
 }
 
 type PaymentType = Payment['type'];
 
-export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, cashierName, onSuccess }: CheckoutModalProps) {
+export function CheckoutModal({ isOpen, onClose, cashierId, cashierName }: CheckoutModalProps) {
   const { toast } = useToast();
+  const { cart, totals, clearCart } = useCartStore();
   const [amountTenderedStr, setAmountTenderedStr] = useState('');
   const [isProcessing, setProcessing] = useState(false);
   const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
 
   const amountTendered = useMemo(() => parseToCents(amountTenderedStr), [amountTenderedStr]);
   const changeDue = useMemo(() => Math.max(0, amountTendered - totals.totalInc), [amountTendered, totals.totalInc]);
+  
+  // Auto-fill tendered amount when modal opens for convenience
+  useEffect(() => {
+    if (isOpen) {
+      setAmountTenderedStr((totals.totalInc / 100).toFixed(2));
+    }
+  }, [isOpen, totals.totalInc]);
   
   const handleClose = () => {
     setAmountTenderedStr('');
@@ -62,7 +68,7 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, cashie
     setProcessing(true);
     
     try {
-      const { orderId: newOrderId } = await call<{ orderId: string }, any>('cashierCreateOrder', { note: '' });
+      const { orderId: newOrderId } = await call('cashierCreateOrder', { note: '' });
       if (!newOrderId) throw new Error("Failed to create order.");
 
       await call('cashierSetItems', { 
@@ -83,7 +89,7 @@ export function CheckoutModal({ isOpen, onClose, cart, totals, cashierId, cashie
         description: type === 'cash' ? `Change due: ${fmtZAR(changeDue)}` : 'Payment complete.',
       });
       
-      onSuccess();
+      clearCart();
       setCompletedOrderId(newOrderId);
 
     } catch (error: any) {

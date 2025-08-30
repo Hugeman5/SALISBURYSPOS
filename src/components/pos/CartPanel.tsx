@@ -1,7 +1,7 @@
 
 'use client';
 import { useMemo, useState } from 'react';
-import { CartLineItem } from '@/types/pos';
+import { useCartStore } from '@/stores/cart-store';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -11,44 +11,14 @@ import { CheckoutModal } from './CheckoutModal';
 import { useToast } from '@/hooks/use-toast';
 
 interface CartPanelProps {
-  cart: CartLineItem[];
-  setCart: React.Dispatch<React.SetStateAction<CartLineItem[]>>;
   cashierId: string;
   cashierName: string;
 }
 
-export function CartPanel({ cart, setCart, cashierId, cashierName }: CartPanelProps) {
+export function CartPanel({ cashierId, cashierName }: CartPanelProps) {
   const { toast } = useToast();
+  const { cart, updateQuantity, clearCart, totals } = useCartStore();
   const [isCheckoutOpen, setCheckoutOpen] = useState(false);
-
-  const updateQuantity = (productId: string, delta: number) => {
-    setCart(currentCart => {
-      const item = currentCart.find(i => i.productId === productId);
-      if (!item) return currentCart;
-
-      const newQty = item.qty + delta;
-
-      if (item.trackStock && item.stockOnHand !== undefined && newQty > item.stockOnHand) {
-        toast({
-            variant: "destructive",
-            title: "Stock Limit Reached",
-            description: `Only ${item.stockOnHand} of ${item.name} available.`,
-        });
-        return currentCart;
-      }
-
-      if (newQty <= 0) {
-        return currentCart.filter(i => i.productId !== productId);
-      }
-      return currentCart.map(i => i.productId === productId ? { ...i, qty: newQty } : i);
-    });
-  };
-
-  const totals = useMemo(() => {
-    const totalInc = cart.reduce((acc, item) => acc + (item.priceInclCents * item.qty), 0);
-    const { excl, vat } = splitVat(totalInc);
-    return { subTotalEx: excl, vat, totalInc };
-  }, [cart]);
 
   const handleCheckout = () => {
     if (cart.length === 0) {
@@ -98,7 +68,7 @@ export function CartPanel({ cart, setCart, cashierId, cashierName }: CartPanelPr
             <div className="flex justify-between font-bold text-lg"><span>Total</span><span>{fmtZAR(totals.totalInc)}</span></div>
           </div>
           <div className="grid grid-cols-2 gap-2 mt-4">
-            <Button variant="outline" onClick={() => setCart([])} disabled={cart.length === 0}>
+            <Button variant="outline" onClick={clearCart} disabled={cart.length === 0}>
                 <Trash2 className="mr-2 h-4 w-4"/> Clear
             </Button>
             <Button size="lg" onClick={handleCheckout} disabled={cart.length === 0}>Pay</Button>
@@ -108,13 +78,8 @@ export function CartPanel({ cart, setCart, cashierId, cashierName }: CartPanelPr
       <CheckoutModal
         isOpen={isCheckoutOpen}
         onClose={() => setCheckoutOpen(false)}
-        cart={cart}
-        totals={totals}
         cashierId={cashierId}
         cashierName={cashierName}
-        onSuccess={() => {
-          setCart([]);
-        }}
       />
     </>
   );
