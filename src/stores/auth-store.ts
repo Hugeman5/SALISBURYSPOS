@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { signInWithCustomToken, signOut, onAuthStateChanged, type User as FbUser } from 'firebase/auth';
+import { signInWithCustomToken, signOut, onAuthStateChanged, getIdTokenResult, type User as FbUser } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import type { Role, User } from '@/types';
@@ -50,12 +50,19 @@ export const useAuth = create<AuthState>()(
             return false;
           }
 
-          const { token, role } = await res.json();
+          const { token, role: roleFromApi } = await res.json();
           const userCredential = await signInWithCustomToken(auth, token);
           
-          // After sign in, getFromFirebase will be triggered by onAuthStateChanged
-          // but we can set the role immediately for faster routing.
-          set({ role: (role as Role) || 'cashier' });
+          let role = roleFromApi;
+          if (!role) {
+            const user = auth.currentUser;
+            if (user) {
+                const idTokenResult = await getIdTokenResult(user, true);
+                role = (idTokenResult.claims.role as any) || null;
+            }
+          }
+
+          set({ role: (role || 'cashier') as Role });
           return true;
         } catch (e) {
           const msg = String((e as any)?.message ?? e);
