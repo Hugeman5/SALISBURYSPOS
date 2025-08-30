@@ -9,7 +9,6 @@ import * as admin from "firebase-admin";
 import * as bcrypt from "bcryptjs";
 import {z} from "zod";
 import {db, requireRole} from "./utils";
-import type {Role} from "./utils";
 
 const UpsertUserPayloadSchema = z.object({
   id: z.string().optional(),
