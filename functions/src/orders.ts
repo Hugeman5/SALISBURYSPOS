@@ -201,8 +201,8 @@ export const cashierCloseOrder = onCall({cors: true}, async (req) => {
     };
 
     // If cash was used, update the register session and link it to the order
-    const hasCashPayment = payments.some((p) => p.type === "cash");
-    if (hasCashPayment) {
+    const cashPayments = payments.filter((p) => p.type === "cash");
+    if (cashPayments.length > 0) {
       const openSessionSnap = await db.collection("register_sessions")
         .where("status", "==", "open").limit(1).get();
 
@@ -215,13 +215,15 @@ export const cashierCloseOrder = onCall({cors: true}, async (req) => {
       const openDoc = openSessionSnap.docs[0];
       orderUpdate.registerSessionId = openDoc.id;
 
-      const cashTotal = payments
-        .filter((p) => p.type === "cash")
-        .reduce((sum, p) => sum + p.amount, 0);
+      const cashPaid = cashPayments.reduce((sum, p) => sum + p.amount, 0);
+      const changeGiven = Math.max(0, totalPaid - totals.totalInc);
+      const cashDelta = cashPaid - changeGiven;
 
-      tx.update(openDoc.ref, {
-        expectedCash: admin.firestore.FieldValue.increment(cashTotal),
-      });
+      if (cashDelta !== 0) {
+        tx.update(openDoc.ref, {
+          expectedCash: admin.firestore.FieldValue.increment(cashDelta),
+        });
+      }
     }
 
     tx.update(orderRef, orderUpdate);

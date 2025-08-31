@@ -2,7 +2,7 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, limit, where } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
 import { useAuth } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -66,7 +66,7 @@ export default function CashRegisterPage() {
         if (!openSession) return;
         const countedStr = prompt("Enter the final cash amount counted in the drawer (e.g., 1234.50):");
         if (countedStr === null) return; // User cancelled
-        const counted = parseFloat(countedStr);
+        const counted = parseFloat(countedStr.replace(/[^0-9.]/g, ''));
         if (isNaN(counted)) {
             toast({ variant: "destructive", title: "Invalid amount entered." });
             return;
