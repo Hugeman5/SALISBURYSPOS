@@ -3,12 +3,12 @@
  * @fileoverview User and authentication management functions.
  */
 
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as bcrypt from "bcryptjs";
-import { z } from "zod";
-import { db, requireRole } from "./utils";
+import {z} from "zod";
+import {db, requireRole} from "./utils";
 
 const UpsertUserPayloadSchema = z.object({
   id: z.string().optional(),
@@ -24,7 +24,7 @@ const UpsertUserPayloadSchema = z.object({
  * @param {object} req The request object.
  * @return {Promise<{ok: true, id: string}>} A promise that resolves on success.
  */
-export const adminUpsertUser = onCall({ cors: true }, async (req) => {
+export const adminUpsertUser = onCall({cors: true}, async (req) => {
   const actorRole = requireRole(req, ["admin", "manager"]);
   const result = UpsertUserPayloadSchema.safeParse(req.data);
   if (!result.success) {
@@ -33,12 +33,17 @@ export const adminUpsertUser = onCall({ cors: true }, async (req) => {
   const data = result.data;
 
   // Additional Validation
-  if (!data.id && !/^[a-z0-9-]{3,24}$/.test(data.id || "")) {
+  if (data.id && !/^[a-z0-9-]{3,24}$/.test(data.id)) {
+    // This is an edit, the ID is not being changed, so we don't validate it.
+    // We can just proceed. In a real app, you might want to check if the user
+    // is trying to change the ID, which is not allowed.
+  } else if (!data.id) {
     throw new HttpsError(
       "invalid-argument",
       "On create, ID must be 3-24 lowercase letters, numbers, or hyphens."
     );
   }
+
   if (actorRole !== "admin" && data.role === "admin") {
     throw new HttpsError(
       "permission-denied",
@@ -46,7 +51,12 @@ export const adminUpsertUser = onCall({ cors: true }, async (req) => {
     );
   }
 
-  const userId = data.id || db.collection("users").doc().id;
+  const userId = data.id;
+  if (!userId) {
+    // This should not happen if the above validation is correct.
+    throw new HttpsError("invalid-argument", "User ID is required.");
+  }
+
   const userRef = db.collection("users").doc(userId);
   const hourlyRateCents = Math.round(data.hourlyRateZar * 100);
 
@@ -69,7 +79,7 @@ export const adminUpsertUser = onCall({ cors: true }, async (req) => {
     await userRef.update(userData);
   }
 
-  return { ok: true, id: userId };
+  return {ok: true, id: userId};
 });
 
 /**
@@ -78,9 +88,9 @@ export const adminUpsertUser = onCall({ cors: true }, async (req) => {
  * @param {object} req The request object.
  * @return {Promise<{ok: true, id: string}>} A promise that resolves on success.
  */
-export const adminDeleteUser = onCall({ cors: true }, async (req) => {
+export const adminDeleteUser = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin"]);
-  const { id } = z.object({ id: z.string().min(1) }).parse(req.data);
+  const {id} = z.object({id: z.string().min(1)}).parse(req.data);
 
   const batch = db.batch();
   batch.delete(db.collection("users").doc(id));
@@ -95,7 +105,7 @@ export const adminDeleteUser = onCall({ cors: true }, async (req) => {
     }),
   ]);
 
-  return { ok: true, id };
+  return {ok: true, id};
 });
 
 const SetPinPayloadSchema = z.object({
@@ -108,9 +118,9 @@ const SetPinPayloadSchema = z.object({
  * @param {object} req The request object.
  * @return {Promise<{ok: true}>} A promise that resolves on success.
  */
-export const adminSetUserPin = onCall({ cors: true }, async (req) => {
+export const adminSetUserPin = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
-  const { id, pin } = SetPinPayloadSchema.parse(req.data);
+  const {id, pin} = SetPinPayloadSchema.parse(req.data);
 
   // Ensure user exists in Firestore before setting a pin.
   const userDoc = await db.collection("users").doc(id).get();
@@ -132,7 +142,7 @@ export const adminSetUserPin = onCall({ cors: true }, async (req) => {
       throw new HttpsError("internal", error.message);
     }
   }
-  
+
   const pinHash = await bcrypt.hash(pin, 10);
 
   await db
@@ -143,8 +153,8 @@ export const adminSetUserPin = onCall({ cors: true }, async (req) => {
         pinHash,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       },
-      { merge: true }
+      {merge: true}
     );
 
-  return { ok: true };
+  return {ok: true};
 });
