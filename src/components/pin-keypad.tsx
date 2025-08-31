@@ -11,9 +11,10 @@ interface PinKeypadProps {
   onSubmit: () => void;
   busy?: boolean;
   hasError?: boolean;
+  submitLabel?: string;
 }
 
-export function PinKeypad({ pin, onPinChange, onSubmit, busy = false, hasError = false }: PinKeypadProps) {
+export function PinKeypad({ pin, onPinChange, onSubmit, busy = false, hasError = false, submitLabel = "Login" }: PinKeypadProps) {
   const push = (n: string) => {
     if (busy || pin.length >= 4) return;
     onPinChange(pin + n);
@@ -75,7 +76,7 @@ export function PinKeypad({ pin, onPinChange, onSubmit, busy = false, hasError =
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.5 }}
              >
-                Login
+                {submitLabel}
              </motion.span>
         )}
         </AnimatePresence>

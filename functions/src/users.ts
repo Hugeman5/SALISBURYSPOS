@@ -33,15 +33,12 @@ export const adminUpsertUser = onCall({cors: true}, async (req) => {
   const data = result.data;
 
   // Additional Validation
-  if (data.id && !/^[a-z0-9-]{3,24}$/.test(data.id)) {
-    // This is an edit, the ID is not being changed, so we don't validate it.
-    // We can just proceed. In a real app, you might want to check if the user
-    // is trying to change the ID, which is not allowed.
-  } else if (!data.id) {
-    throw new HttpsError(
-      "invalid-argument",
-      "On create, ID must be 3-24 lowercase letters, numbers, or hyphens."
-    );
+  if (!data.id) {
+    throw new HttpsError("invalid-argument", "User ID is required for upsert.");
+  }
+  
+  if (req.data.isNew && !/^[a-z0-9-]{3,24}$/.test(data.id)) {
+      throw new HttpsError("invalid-argument", "On create, ID must be 3-24 lowercase letters, numbers, or hyphens.");
   }
 
   if (actorRole !== "admin" && data.role === "admin") {
@@ -52,10 +49,6 @@ export const adminUpsertUser = onCall({cors: true}, async (req) => {
   }
 
   const userId = data.id;
-  if (!userId) {
-    // This should not happen if the above validation is correct.
-    throw new HttpsError("invalid-argument", "User ID is required.");
-  }
 
   const userRef = db.collection("users").doc(userId);
   const hourlyRateCents = Math.round(data.hourlyRateZar * 100);

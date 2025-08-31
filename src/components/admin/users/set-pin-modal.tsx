@@ -89,7 +89,7 @@ export function SetPinModal({ user, onClose }: SetPinModalProps) {
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Set PIN for: {user.name}</DialogTitle>
+          <DialogTitle>Set PIN for: {user.name} ({user.role})</DialogTitle>
           <DialogDescription>
             {step === 'enter' ? 'Enter a new 4-digit PIN.' : 'Confirm the new PIN.'}
           </DialogDescription>
@@ -101,6 +101,7 @@ export function SetPinModal({ user, onClose }: SetPinModalProps) {
                 busy={isProcessing}
                 hasError={!!error}
                 onSubmit={() => {}}
+                submitLabel='Set PIN'
             />
             <div className="min-h-[20px] pt-4 text-center text-sm text-destructive" aria-live="polite">
                 {error}
