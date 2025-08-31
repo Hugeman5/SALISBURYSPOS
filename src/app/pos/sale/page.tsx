@@ -88,7 +88,7 @@ export default function SalePage() {
   if (!profile) return null; // RoleGate will handle redirect
 
   return (
-    <RoleGate allow={['admin', 'manager', 'cashier']}>
+    <RoleGate allow={['admin', 'manager', 'cashier', 'waiter', 'kitchen']}>
       <div className="flex h-screen bg-muted/40">
         <div className="flex flex-col w-3/5 p-4 space-y-4">
           <header className="flex gap-2 items-center">

@@ -10,14 +10,13 @@ export async function GET() {
     const usersSnap = await adminDb.collection('users').where('active','==',true).get();
     const results: Array<{id:string; name:string; role:string}> = [];
 
-    // Temporarily disabled PIN check to allow admin login
     const checks = usersSnap.docs.map(async d => {
       const id = d.id;
-      // const s = await adminDb.collection('user_secrets').doc(id).get();
-      // if (s.exists && s.data()?.pinHash) {
+      const s = await adminDb.collection('user_secrets').doc(id).get();
+      if (s.exists && s.data()?.pinHash) {
         const { name, role } = d.data() as any;
         results.push({ id, name, role });
-      // }
+      }
     });
     await Promise.all(checks);
 
