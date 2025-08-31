@@ -16,6 +16,7 @@ const UpsertUserPayloadSchema = z.object({
   role: z.enum(["admin", "manager", "cashier", "waiter", "kitchen"]),
   active: z.boolean(),
   hourlyRateZar: z.number().min(0),
+  isNew: z.boolean().optional(),
 });
 
 /**
@@ -37,7 +38,7 @@ export const adminUpsertUser = onCall({cors: true}, async (req) => {
     throw new HttpsError("invalid-argument", "User ID is required for upsert.");
   }
   
-  if (req.data.isNew && !/^[a-z0-9-]{3,24}$/.test(data.id)) {
+  if (data.isNew && !/^[a-z0-9-]{3,24}$/.test(data.id)) {
       throw new HttpsError("invalid-argument", "On create, ID must be 3-24 lowercase letters, numbers, or hyphens.");
   }
 
@@ -62,8 +63,7 @@ export const adminUpsertUser = onCall({cors: true}, async (req) => {
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   };
 
-  const doc = await userRef.get();
-  if (!doc.exists) {
+  if (data.isNew) {
     await userRef.set({
       ...userData,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),

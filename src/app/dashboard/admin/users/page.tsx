@@ -70,6 +70,7 @@ export default function UsersPage() {
           role: data.role,
           active: data.active,
           hourlyRateZar: Number(data.hourlyRateZar) || 0,
+          isNew: !editingUser,
       });
       toast({ title: 'User saved successfully' });
       setDrawerOpen(false);
