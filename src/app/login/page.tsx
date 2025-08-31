@@ -10,6 +10,14 @@ import { db } from '@/lib/firebase';
 
 type LoginableUser = Pick<User, 'id' | 'name' | 'role' | 'active'>;
 
+const defaultRouteByRole: Record<Role, string> = {
+  admin: '/dashboard/admin',
+  manager: '/dashboard/admin',
+  cashier: '/pos',
+  waiter: '/pos',
+  kitchen: '/pos',
+};
+
 export default function LoginPage() {
   attachAuthListenerOnce();
   const router = useRouter();
@@ -23,7 +31,7 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if(profile) {
-        const target = profile.role === 'admin' || profile.role === 'manager' ? '/dashboard/admin' : '/pos';
+        const target = defaultRouteByRole[profile.role] || '/pos';
         router.replace(target);
     }
   },[profile, router]);
