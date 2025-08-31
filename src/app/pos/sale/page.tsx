@@ -17,10 +17,11 @@ import { useCartStore } from '@/stores/cart-store';
 import { ProductGrid } from '@/components/pos/ProductGrid';
 import { CartPanel } from '@/components/pos/CartPanel';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Search, ChevronLeft } from 'lucide-react';
 import { LogoutButton } from '@/components/auth/logout-button';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { useDebounce } from '@/hooks/use-debounce';
 
 export default function SalePage() {
   const profile = useAuth((s) => s.profile);
@@ -29,6 +30,7 @@ export default function SalePage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 250);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -53,8 +55,9 @@ export default function SalePage() {
         (doc) => ({ id: doc.id, ...doc.data() } as Product)
       );
 
-      setCategories(categoriesData);
+      setCategories([{ id: 'all', name: 'All Products', nameLower: 'all', sort: -1 }, ...categoriesData]);
       setProducts(productsData);
+      setActiveCategoryId('all');
     } catch (error) {
       console.error('Error fetching products or categories:', error);
     } finally {
@@ -69,12 +72,12 @@ export default function SalePage() {
   const filteredProducts = useMemo(() => {
     let filtered = products;
 
-    if (activeCategoryId) {
+    if (activeCategoryId && activeCategoryId !== 'all') {
       filtered = filtered.filter((p) => p.categoryId === activeCategoryId);
     }
 
-    if (searchTerm) {
-      const lowercasedTerm = searchTerm.toLowerCase();
+    if (debouncedSearchTerm) {
+      const lowercasedTerm = debouncedSearchTerm.toLowerCase();
       filtered = filtered.filter(
         (p) =>
           p.name.toLowerCase().includes(lowercasedTerm) ||
@@ -83,37 +86,25 @@ export default function SalePage() {
     }
 
     return filtered;
-  }, [products, searchTerm, activeCategoryId]);
+  }, [products, debouncedSearchTerm, activeCategoryId]);
 
-  if (!profile) return null; // RoleGate will handle redirect
+  if (!profile) return null; 
 
   return (
     <RoleGate allow={['admin', 'manager', 'cashier', 'waiter', 'kitchen']}>
       <div className="flex h-screen bg-muted/40">
         <div className="flex flex-col w-3/5 p-4 space-y-4">
           <header className="flex gap-2 items-center">
-            <Link href="/dashboard/admin">
-              <Button variant="outline" size="icon">
-                <svg
-                  className="h-4 w-4"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  <polyline points="9 22 9 12 15 12 15 22" />
-                </svg>
+            <Link href="/dashboard/admin" passHref>
+              <Button variant="outline" size="icon" asChild>
+                <a><ChevronLeft className="h-4 w-4" /></a>
               </Button>
             </Link>
             <div className="relative flex-grow">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Search products by name or SKU..."
+                placeholder="Search products by name or SKU... (Ctrl+K)"
                 className="pl-8"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -124,19 +115,13 @@ export default function SalePage() {
 
           <div className="border-b">
             <div className="flex items-center gap-2 overflow-x-auto pb-2">
-              <Button
-                variant={!activeCategoryId ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setActiveCategoryId(null)}
-              >
-                All Products
-              </Button>
               {categories.map((cat) => (
                 <Button
                   key={cat.id}
                   variant={activeCategoryId === cat.id ? 'secondary' : 'ghost'}
                   size="sm"
                   onClick={() => setActiveCategoryId(cat.id)}
+                  className="shrink-0"
                 >
                   {cat.name}
                 </Button>

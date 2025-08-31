@@ -37,9 +37,9 @@ export const adminUpsertUser = onCall({cors: true}, async (req) => {
   if (!data.id) {
     throw new HttpsError("invalid-argument", "User ID is required for upsert.");
   }
-  
+
   if (data.isNew && !/^[a-z0-9-]{3,24}$/.test(data.id)) {
-      throw new HttpsError("invalid-argument", "On create, ID must be 3-24 lowercase letters, numbers, or hyphens.");
+    throw new HttpsError("invalid-argument", "On create, ID must be 3-24 lowercase letters, numbers, or hyphens.");
   }
 
   if (actorRole !== "admin" && data.role === "admin") {

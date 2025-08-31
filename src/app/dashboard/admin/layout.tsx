@@ -30,19 +30,20 @@ import Link from 'next/link';
 import { RoleGate } from '@/components/auth-gate';
 
 const menuItems = [
-  { href: '/dashboard/admin', title: 'Dashboard', icon: Home },
-  { href: '/pos/sale', title: 'Point of Sale', icon: ShoppingCart },
-  { href: '/dashboard/admin/orders', title: 'Orders', icon: Receipt },
-  { href: '/dashboard/admin/products', title: 'Products', icon: Package },
-  { href: '/dashboard/admin/inventory', title: 'Inventory', icon: LayoutGrid },
+  { href: '/dashboard/admin', title: 'Dashboard', icon: Home, roles: ['admin', 'manager'] },
+  { href: '/pos/sale', title: 'Point of Sale', icon: ShoppingCart, roles: ['admin', 'manager', 'cashier', 'waiter', 'kitchen'] },
+  { href: '/dashboard/admin/orders', title: 'Orders', icon: Receipt, roles: ['admin', 'manager'] },
+  { href: '/dashboard/admin/products', title: 'Products', icon: Package, roles: ['admin', 'manager'] },
+  { href: '/dashboard/admin/inventory', title: 'Inventory', icon: LayoutGrid, roles: ['admin', 'manager'] },
   {
     href: '/dashboard/admin/cash-register',
     title: 'Cash Register',
     icon: DollarSign,
+    roles: ['admin', 'manager', 'cashier'],
   },
-  { href: '/dashboard/admin/users', title: 'Users & Roles', icon: Users },
-  { href: '/dashboard/admin/reports', title: 'Reports', icon: BarChart3 },
-  { href: '/dashboard/admin/timeclock', title: 'Time Clock', icon: Clock },
+  { href: '/dashboard/admin/users', title: 'Users & Roles', icon: Users, roles: ['admin', 'manager'] },
+  { href: '/dashboard/admin/reports', title: 'Reports', icon: BarChart3, roles: ['admin', 'manager'] },
+  { href: '/dashboard/admin/timeclock', title: 'Time Clock', icon: Clock, roles: ['admin', 'manager', 'cashier', 'waiter', 'kitchen'] },
 ];
 
 export default function AdminLayout({
@@ -51,21 +52,23 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const profile = useAuth((s) => s.profile);
+  const { profile, role } = useAuth();
+
+  const accessibleMenuItems = menuItems.filter(item => role && item.roles.includes(role));
 
   return (
-    <RoleGate allow={['admin', 'manager']}>
+    <RoleGate allow={['admin', 'manager', 'cashier', 'waiter', 'kitchen']}>
       <SidebarProvider>
         <Sidebar>
           <SidebarHeader>
             <div className="flex items-center gap-2 p-2">
               <SidebarTrigger />
-              <h1 className="text-xl font-semibold">Sals POS</h1>
+              <h1 className="text-xl font-semibold">ZA-POS</h1>
             </div>
           </SidebarHeader>
           <SidebarContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {accessibleMenuItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild

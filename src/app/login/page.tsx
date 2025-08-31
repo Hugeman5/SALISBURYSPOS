@@ -13,9 +13,9 @@ type LoginableUser = Pick<User, 'id' | 'name' | 'role' | 'active'>;
 const defaultRouteByRole: Record<Role, string> = {
   admin: '/dashboard/admin',
   manager: '/dashboard/admin',
-  cashier: '/pos',
-  waiter: '/pos',
-  kitchen: '/pos',
+  cashier: '/pos/sale',
+  waiter: '/pos/sale',
+  kitchen: '/pos/sale',
 };
 
 export default function LoginPage() {
@@ -31,7 +31,7 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if(profile) {
-        const target = defaultRouteByRole[profile.role] || '/pos';
+        const target = defaultRouteByRole[profile.role] || '/pos/sale';
         router.replace(target);
     }
   },[profile, router]);
