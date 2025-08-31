@@ -7,21 +7,18 @@ import { adminDb } from '@/lib/firebase-admin';
 
 export async function GET() {
   try {
-    const usersSnap = await adminDb.collection('users').where('active','==',true).get();
+    const usersSnap = await adminDb.collection('users').where('active','==',true).orderBy('name').get();
+    
     const results: Array<{id:string; name:string; role:string}> = [];
 
-    const checks = usersSnap.docs.map(async d => {
-      const id = d.id;
-      const s = await adminDb.collection('user_secrets').doc(id).get();
-      if (s.exists && s.data()?.pinHash) {
-        const { name, role } = d.data() as any;
-        results.push({ id, name, role });
+    for (const doc of usersSnap.docs) {
+      const data = doc.data();
+      // A user is loginable if they have a pinHash set.
+      if (data.pinHash) {
+        results.push({ id: doc.id, name: data.name, role: data.role });
       }
-    });
-    await Promise.all(checks);
+    }
 
-    // Stable ordering
-    results.sort((a,b) => a.name.localeCompare(b.name));
     return NextResponse.json({ ok: true, users: results });
   } catch (e:any) {
     console.error('loginable-users error:', e);
