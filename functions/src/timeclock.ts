@@ -3,7 +3,7 @@
  * @fileoverview Cloud Functions for employee time clock management.
  */
 
-import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {onCall, HttpsError, type CallableRequest} from "firebase-functions/v2/https";
 import {Timestamp} from "firebase-admin/firestore";
 import {db, requireRole, Role, STAFF_ROLES} from "./utils";
 
@@ -43,7 +43,7 @@ async function getLatestOpen(uid: string) {
  * Clocks a user in, creating a new session document.
  * It's idempotent; if the user is already clocked in, it returns success.
  */
-export const clockIn = onCall({cors: true}, async (req) => {
+export const clockIn = onCall({cors: true}, async (req: CallableRequest) => {
   const role: Role = requireRole(req, STAFF_ROLES);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
@@ -77,7 +77,7 @@ export const clockIn = onCall({cors: true}, async (req) => {
  * Clocks a user out, updating their latest open session with an end time
  * and calculated duration and cost.
  */
-export const clockOut = onCall({cors: true}, async (req) => {
+export const clockOut = onCall({cors: true}, async (req: CallableRequest) => {
   requireRole(req, STAFF_ROLES);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
@@ -104,7 +104,7 @@ export const clockOut = onCall({cors: true}, async (req) => {
 /**
  * Exports time clock sessions within a date range to a CSV string.
  */
-export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
+export const adminExportTimeCsv = onCall({cors: true}, async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   const {startMs, endMs} = req.data as {startMs?: number, endMs?: number};
   if (!startMs || !endMs || endMs <= startMs) {

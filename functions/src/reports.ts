@@ -2,7 +2,7 @@
  * @fileoverview Cloud Functions for generating daily sales reports (Z-Reports).
  */
 
-import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {onCall, HttpsError, type CallableRequest} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {Timestamp} from "firebase-admin/firestore";
 import {db, requireRole} from "./utils";
@@ -43,7 +43,7 @@ function saDayWindow(dateStr?: string) {
  * This is idempotent; running it multiple times for the same day will
  * overwrite the previous report with updated data.
  */
-export const adminCloseDay = onCall({cors: true}, async (req) => {
+export const adminCloseDay = onCall({cors: true}, async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
@@ -102,7 +102,7 @@ export const adminCloseDay = onCall({cors: true}, async (req) => {
 /**
  * Exports a previously generated Z-Report to a CSV string.
  */
-export const adminExportZCsv = onCall({cors: true}, async (req) => {
+export const adminExportZCsv = onCall({cors: true}, async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   const {date} = req.data as {date?: string};
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {

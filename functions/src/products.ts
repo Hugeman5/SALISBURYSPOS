@@ -2,7 +2,7 @@
  * @fileoverview Cloud Functions for product and category management.
  */
 
-import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {onCall, HttpsError, type CallableRequest} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {db, requireRole} from "./utils";
 
@@ -128,13 +128,13 @@ async function upsertProductCore(input: UpsertInput) {
 }
 
 /** Callable to upsert a single product. */
-export const adminUpsertProduct = onCall({cors: true}, async (req) => {
+export const adminUpsertProduct = onCall({cors: true}, async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   return upsertProductCore(req.data as UpsertInput);
 });
 
 /** Callable to delete a single product. */
-export const adminDeleteProduct = onCall({cors: true}, async (req) => {
+export const adminDeleteProduct = onCall({cors: true}, async (req: CallableRequest) => {
   requireRole(req, ["admin"]);
   const {id} = req.data as {id?: string};
   if (!id) throw new HttpsError("invalid-argument", "Product ID is required.");
@@ -143,7 +143,7 @@ export const adminDeleteProduct = onCall({cors: true}, async (req) => {
 });
 
 /** Callable to export all products to a CSV string. */
-export const adminExportProducts = onCall({cors: true}, async (req) => {
+export const adminExportProducts = onCall({cors: true}, async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   const snap = await db.collection("products").orderBy("nameLower").get();
   const rows: string[] = [
@@ -166,7 +166,7 @@ export const adminExportProducts = onCall({cors: true}, async (req) => {
 });
 
 /** Callable to bulk import products from a CSV string. */
-export const adminBulkImportProducts = onCall({cors: true}, async (req) => {
+export const adminBulkImportProducts = onCall({cors: true}, async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   const csv: string = (req.data as {csv?: string})?.csv || "";
   if (!csv) throw new HttpsError("invalid-argument", "CSV data is required.");

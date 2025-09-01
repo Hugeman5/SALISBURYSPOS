@@ -2,7 +2,7 @@
  * @fileoverview Cloud Functions for inventory and stock management.
  */
 
-import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {onCall, HttpsError, type CallableRequest} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {format} from "date-fns";
 import {db, requireRole} from "./utils";
@@ -25,7 +25,7 @@ interface PostMovementPayload {
  * Posts a stock movement to the inventory ledger and updates the product's
  * stock-on-hand count in a single transaction. Supports idempotency.
  */
-export const adminPostStockMovement = onCall({cors: true}, async (req) => {
+export const adminPostStockMovement = onCall({cors: true}, async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   const uid = req.auth?.uid;
   if (!uid) {
@@ -119,7 +119,7 @@ interface ExportLedgerPayload {
 /**
  * Exports the inventory ledger to a CSV file, with optional filters.
  */
-export const adminExportLedger = onCall({cors: true}, async (req) => {
+export const adminExportLedger = onCall({cors: true}, async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   const data = req.data as ExportLedgerPayload;
   const {productId, type, fromTs, toTs} = data;
