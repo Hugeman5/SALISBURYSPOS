@@ -18,5 +18,6 @@ export const db = getFirestore(app);
 export const functions = getFunctions(app, 'us-central1');
 
 if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true') {
+  console.log('Connecting to functions emulator');
   connectFunctionsEmulator(functions, '127.0.0.1', 5001);
 }

@@ -7,7 +7,7 @@ import { functions } from "@/lib/firebase";
  * @param data The data payload to send to the function.
  * @returns A promise that resolves with the data returned by the function.
  */
-export async function call<TRes, TReq>(name: string, data: TReq): Promise<TRes> {
+export async function call<TRes, TReq = {}>(name: string, data: TReq): Promise<TRes> {
   const fn = httpsCallable<TReq, TRes>(functions, name);
   const res = await fn(data);
   return res.data;

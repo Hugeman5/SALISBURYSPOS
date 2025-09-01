@@ -34,7 +34,6 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
-import { call } from '@/lib/functions/call';
 
 const roles: Role[] = ['admin', 'manager', 'cashier', 'waiter', 'kitchen'];
 

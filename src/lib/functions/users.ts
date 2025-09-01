@@ -1,15 +1,15 @@
-
 import type { Role } from '@/types';
 import { call } from './call';
 
 // Types must match the payload shapes expected by the Cloud Functions
 export type UpsertUserPayload = {
-  id?: string;
+  id: string; // The user's ID. For new users, this is the proposed ID.
   name: string;
   role: Role;
   active: boolean;
   hourlyRateZar: number;
 };
+
 export const upsertUser = (data: UpsertUserPayload) => 
   call<{ ok: boolean, id: string }, UpsertUserPayload>('adminUpsertUser', data);
 
