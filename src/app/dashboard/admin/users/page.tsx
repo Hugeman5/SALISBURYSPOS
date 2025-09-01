@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { User, Role } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -50,14 +50,14 @@ export default function UsersPage() {
     return () => unsubscribe();
   }, [toast]);
 
-  const handleDeleteUser = async (userId: string) => {
+  const handleDeleteUser = async (user: User) => {
     if (!canDelete) return;
-    if (confirm('Are you sure you want to permanently delete this user and their auth account? This cannot be undone.')) {
+    if (confirm(`Are you sure you want to set user "${user.name}" to inactive? They will no longer be able to log in.`)) {
       try {
-        await call('adminDeleteUser', { id: userId });
-        toast({ title: 'User deleted' });
+        await call('adminDeleteUser', { id: user.id });
+        toast({ title: 'User set to inactive' });
       } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Delete failed', description: error.message });
+        toast({ variant: 'destructive', title: 'Update failed', description: error.message });
       }
     }
   };
@@ -173,10 +173,10 @@ export default function UsersPage() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => openDrawerForEdit(user)}>Edit Details</DropdownMenuItem>
                               <DropdownMenuItem onClick={() => setPinModalUser(user)}>Set PIN</DropdownMenuItem>
-                              {canDelete && (
+                              {canDelete && user.active && (
                                 <>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteUser(user.id)}>Delete User</DropdownMenuItem>
+                                  <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteUser(user)}>Deactivate User</DropdownMenuItem>
                                 </>
                               )}
                             </DropdownMenuContent>

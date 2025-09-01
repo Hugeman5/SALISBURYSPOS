@@ -3,19 +3,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth, attachAuthListenerOnce } from '@/stores/auth-store';
 import { useRouter } from 'next/navigation';
-import { Role, User } from '@/types';
-import { PinKeypad } from '@/components/pin-keypad';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import type { Role } from '@/types';
 
-type LoginableUser = Pick<User, 'id' | 'name' | 'role' | 'active'>;
+type LoginableUser = { id: string; name: string; role: Role; };
 
 const defaultRouteByRole: Record<Role, string> = {
   admin: '/dashboard/admin',
   manager: '/dashboard/admin',
   cashier: '/pos/sale',
-  waiter: '/pos/sale',
-  kitchen: '/pos/sale',
+  waiter: '/pos/sale', // Fallback until tables view exists
+  kitchen: '/pos/sale', // Fallback until KDS exists
 };
 
 export default function LoginPage() {
@@ -36,16 +33,18 @@ export default function LoginPage() {
     }
   },[profile, router]);
 
-  // Live user tiles from Firestore (public read)
+  // Fetch loginable users from API route
   useEffect(() => {
-    const q = query(collection(db, 'users'), where('active', '==', true), orderBy('name'));
-    const unsub = onSnapshot(q, (snap) => {
-      const list = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
-      setUsers(list);
-    }, (error) => {
-        console.error("Failed to fetch users:", error);
-    });
-    return () => unsub();
+    fetch('/api/auth/loginable-users')
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok) {
+          setUsers(data.users);
+        } else {
+          console.error("Failed to fetch users:", data.error);
+        }
+      })
+      .catch(console.error);
   }, []);
 
   // Debounced auto-submit when PIN length hits 4

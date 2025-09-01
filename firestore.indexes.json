@@ -1,3 +1,4 @@
+
 {
   "indexes": [
     {
@@ -70,16 +71,40 @@
       "collectionGroup": "time_clock",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "uid", "order": "ASCENDING" },
         { "fieldPath": "outAt", "order": "ASCENDING" },
-        { "fieldPath": "inAt",  "order": "ASCENDING" }
+        { "fieldPath": "inAt", "order": "DESCENDING" }
+      ]
+    },
+     {
+      "collectionGroup": "time_clock",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "uid", "order": "ASCENDING" },
+        { "fieldPath": "inAt", "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "time_clock",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "outAt", "order": "ASCENDING" },
-        { "fieldPath": "inAt",  "order": "DESCENDING" }
+        { "fieldPath": "inAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "register_sessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "openedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "register_sessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "closedAt", "order": "DESCENDING" }
       ]
     }
   ],

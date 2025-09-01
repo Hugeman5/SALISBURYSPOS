@@ -20,6 +20,8 @@ type Punch = {
   outAt?: Date | null;
   durationSec?: number | null;
   costCents?: number | null;
+  userName?: string;
+  uid?: string;
 };
 
 export default function TimeClockPage() {
@@ -36,7 +38,8 @@ export default function TimeClockPage() {
   const refreshState = React.useCallback(async () => {
     if (!uid) return;
     const q = query(
-      collection(db, `time_clock/${uid}/sessions`),
+      collection(db, `time_clock`),
+      where('uid', '==', uid),
       where('outAt', '==', null),
       orderBy('inAt', 'desc'),
       limit(1),
@@ -53,7 +56,8 @@ export default function TimeClockPage() {
     end.setHours(24, 0, 0, 0);
     
     const q = query(
-      collection(db, `time_clock/${uid}/sessions`),
+      collection(db, `time_clock`),
+      where('uid', '==', uid),
       where('inAt', '>=', start),
       where('inAt', '<', end),
       orderBy('inAt', 'desc'),

@@ -5,7 +5,7 @@ import * as React from 'react';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/stores/auth-store';
 import {
-  collectionGroup, query, where, getDocs, doc, getDoc,
+  collection, query, where, getDocs, Timestamp,
 } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,9 +14,10 @@ import { fmtZAR } from '@/utils/money';
 
 type Punch = {
   uid: string;
-  inAt: Date;
-  outAt?: Date | null;
+  inAt: Timestamp;
+  outAt?: Timestamp | null;
   durationSec?: number | null;
+  costCents?: number | null;
 };
 
 function startOfToday(): Date {
@@ -46,10 +47,10 @@ export default function StaffPayrollCard() {
     try {
       // 1) Get all open punches (clocked-in staff)
       const openSnap = await getDocs(query(
-        collectionGroup(db, 'sessions'),
+        collection(db, 'time_clock'),
         where('outAt', '==', null),
       ));
-      const openPunches: Punch[] = openSnap.docs.map((d) => ({ ...d.data(), uid: d.ref.parent.parent!.id } as Punch));
+      const openPunches: Punch[] = openSnap.docs.map((d) => (d.data() as Punch));
       setOpenCount(openPunches.length);
       
       const uids = Array.from(new Set(openPunches.map((p) => p.uid)));
@@ -70,20 +71,34 @@ export default function StaffPayrollCard() {
 
       // 4) Calculate today's total spend
       const todaySnap = await getDocs(query(
-        collectionGroup(db, 'sessions'),
+        collection(db, 'time_clock'),
         where('inAt', '>=', startOfToday()),
         where('inAt', '<', endOfToday()),
       ));
 
       const now = Date.now();
       let totalSpend = 0;
+      
+      // We need all user rates for today, not just open ones
+      const allTodayUIDs = Array.from(new Set(todaySnap.docs.map(d => d.data().uid)));
+      if(allTodayUIDs.length > 0) {
+        const allUsersSnap = await getDocs(query(collection(db, 'users'), where('__name__', 'in', allTodayUIDs)));
+        allUsersSnap.forEach(doc => {
+            if(!userRates.has(doc.id)) {
+                const userData = doc.data() as User;
+                userRates.set(doc.id, userData.hourlyRateCents || 0);
+            }
+        });
+      }
+
       todaySnap.forEach(d => {
         const punch = d.data() as Punch;
-        const rate = userRates.get(punch.uid) || 0;
-        if (rate > 0) {
-            const durSec = punch.outAt
-              ? (punch.durationSec || Math.max(0, Math.round((punch.outAt.getTime() - punch.inAt.getTime()) / 1000)))
-              : Math.max(0, Math.round((now - punch.inAt.getTime()) / 1000));
+        const rate = userRates.get(punch.uid) || punch.costCents || 0; // fallback to stored cost
+        if (punch.outAt) {
+            totalSpend += punch.costCents || 0;
+        } else {
+            // Live calculation for open punches
+            const durSec = Math.max(0, Math.round((now - punch.inAt.toMillis()) / 1000));
             totalSpend += (durSec / 3600) * rate;
         }
       });

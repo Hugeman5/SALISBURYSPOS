@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview Cloud Functions for employee time clock management.
  */
@@ -27,7 +28,8 @@ function saDayKey(ms: number): string {
  * @return {Promise<{id: string, data: any} | null>} The session doc or null.
  */
 async function getLatestOpen(uid: string) {
-  const snap = await db.collection(`time_clock/${uid}/sessions`)
+  const snap = await db.collection("time_clock")
+    .where("uid", "==", uid)
     .where("outAt", "==", null)
     .orderBy("inAt", "desc")
     .limit(1)
@@ -54,10 +56,14 @@ export const clockIn = onCall({cors: true}, async (req) => {
 
   const userSnap = await db.collection("users").doc(uid).get();
   const userData = userSnap.exists ? userSnap.data() : {};
+  if (!userData || !userData.active) {
+    throw new HttpsError("failed-precondition", "User account is not active.");
+  }
+
   const userName = userData?.name || "";
   const hourlyRateCents = userData?.hourlyRateCents || 0;
 
-  const docRef = db.collection(`time_clock/${uid}/sessions`).doc();
+  const docRef = db.collection("time_clock").doc();
   await docRef.set({
     uid, userName, role, inAt: now, outAt: null, durationSec: null,
     hourlyRateCentsAtClockIn: hourlyRateCents, costCents: null,
@@ -88,7 +94,7 @@ export const clockOut = onCall({cors: true}, async (req) => {
   const hourlyRate = open.data.hourlyRateCentsAtClockIn || 0;
   const costCents = Math.round((durationSec / 3600) * hourlyRate);
 
-  await db.collection(`time_clock/${uid}/sessions`).doc(open.id).update({
+  await db.collection("time_clock").doc(open.id).update({
     outAt, durationSec, costCents, updatedAt: outAt,
   });
 
@@ -97,7 +103,6 @@ export const clockOut = onCall({cors: true}, async (req) => {
 
 /**
  * Exports time clock sessions within a date range to a CSV string.
- * Requires a composite index on the 'sessions' collection group.
  */
 export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
@@ -107,7 +112,7 @@ export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
     throw new HttpsError("invalid-argument", msg);
   }
 
-  const snap = await db.collectionGroup("sessions")
+  const snap = await db.collection("time_clock")
     .where("inAt", ">=", Timestamp.fromMillis(startMs))
     .where("inAt", "<", Timestamp.fromMillis(endMs))
     .get();

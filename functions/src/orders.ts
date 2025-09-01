@@ -255,7 +255,8 @@ export const cashierRefundItems = onCall({cors: true}, async (req) => {
     if (!orderSnap.exists) {
       throw new HttpsError("not-found", "Original order not found.");
     }
-    if (orderSnap.data()?.status !== "paid") {
+    const orderData = orderSnap.data();
+    if (!orderData || orderData.status !== "paid") {
       throw new HttpsError(
         "failed-precondition", "Can only refund paid orders."
       );

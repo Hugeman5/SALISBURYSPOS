@@ -32,7 +32,7 @@ import { RoleGate } from '@/components/auth-gate';
 const menuItems = [
   { href: '/dashboard/admin', title: 'Dashboard', icon: Home, roles: ['admin', 'manager'] },
   { href: '/pos/sale', title: 'Point of Sale', icon: ShoppingCart, roles: ['admin', 'manager', 'cashier', 'waiter', 'kitchen'] },
-  { href: '/dashboard/admin/orders', title: 'Orders', icon: Receipt, roles: ['admin', 'manager'] },
+  { href: '/dashboard/admin/orders', title: 'Orders', icon: Receipt, roles: ['admin', 'manager', 'cashier'] },
   { href: '/dashboard/admin/products', title: 'Products', icon: Package, roles: ['admin', 'manager'] },
   { href: '/dashboard/admin/inventory', title: 'Inventory', icon: LayoutGrid, roles: ['admin', 'manager'] },
   {
