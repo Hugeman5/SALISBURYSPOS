@@ -15,7 +15,6 @@ const UpsertUserPayloadSchema = z.object({
   role: z.enum(["admin", "manager", "cashier", "waiter", "kitchen"]),
   active: z.boolean(),
   hourlyRateZar: z.number().min(0).optional().default(0),
-  isNew: z.boolean().optional(),
 });
 
 /**
@@ -31,9 +30,14 @@ export const adminUpsertUser = onCall({cors: true}, async (req: CallableRequest)
     throw new HttpsError("invalid-argument", result.error.message);
   }
   const data = result.data;
+  const userId = data.id;
+  const userRef = db.collection("users").doc(userId);
+  const userDoc = await userRef.get();
+  const isNew = !userDoc.exists;
+
 
   // Additional Validation
-  if (data.isNew && !/^[a-z0-9-]{3,24}$/.test(data.id)) {
+  if (isNew && !/^[a-z0-9-]{3,24}$/.test(data.id)) {
     throw new HttpsError("invalid-argument", "On create, ID must be 3-24 lowercase letters, numbers, or hyphens.");
   }
 
@@ -44,9 +48,6 @@ export const adminUpsertUser = onCall({cors: true}, async (req: CallableRequest)
     );
   }
 
-  const userId = data.id;
-
-  const userRef = db.collection("users").doc(userId);
   const hourlyRateCents = Math.round(data.hourlyRateZar * 100);
 
   const userData: Record<string, any> = {
@@ -58,7 +59,7 @@ export const adminUpsertUser = onCall({cors: true}, async (req: CallableRequest)
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   };
 
-  if (data.isNew) {
+  if (isNew) {
     userData.createdAt = admin.firestore.FieldValue.serverTimestamp();
     await userRef.set(userData);
   } else {
