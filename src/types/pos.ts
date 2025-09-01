@@ -1,4 +1,3 @@
-
 import type { Timestamp } from 'firebase/firestore';
 
 export type Role = 'admin' | 'manager' | 'cashier' | 'waiter' | 'kitchen';
@@ -62,7 +61,6 @@ export interface RefundRequestLine {
   note?: string;
 }
 
-
 export interface Product {
   id: string;
   name: string;
@@ -89,7 +87,7 @@ export interface OrderItem {
 }
 
 export interface Payment {
-  type: "cash" | "card";
+  type: 'cash' | 'card';
   amount: number; // in cents
   ref?: string;
   ts: Timestamp;
@@ -109,7 +107,7 @@ export interface Order {
   closedAt?: Timestamp;
   createdBy: string;
   cashierName?: string;
-  currency: "ZAR";
+  currency: 'ZAR';
   vatRate: number;
   note?: string;
 }
@@ -125,22 +123,22 @@ export interface CartLineItem {
 }
 
 export interface RefundItem {
-    productId: string;
-    qty: number;
-    priceInc: number; // in cents
-    name: string;
+  productId: string;
+  qty: number;
+  priceInc: number; // in cents
+  name: string;
 }
 
 export interface Refund {
-    id: string;
-    createdAt: Timestamp;
-    createdBy: {
-        uid: string;
-        name: string;
-    };
-    items: RefundItem[];
-    method: 'cash' | 'card';
-    originalOrderId: string;
-    reason?: string;
-    totalRefundAmount: number; // in cents
+  id: string;
+  createdAt: Timestamp;
+  createdBy: {
+    uid: string;
+    name: string;
+  };
+  items: RefundItem[];
+  method: 'cash' | 'card';
+  originalOrderId: string;
+  reason?: string;
+  totalRefundAmount: number; // in cents
 }

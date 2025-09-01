@@ -9,49 +9,40 @@ service cloud.firestore {
       return hasRole('admin') || hasRole('manager');
     }
 
-    // --- Users & Secrets ---
     match /users/{userId} {
-      allow read: if request.auth != null;
+      // Admins/managers can manage all users
+      // Users can read their own profile
+      allow read: if isAdminOrManager() || request.auth.uid == userId;
       allow write: if isAdminOrManager();
-    }
-    match /user_secrets/{userId} {
-      allow read, write: if false; // Only accessible by backend functions
     }
     
-    // --- Products & Inventory ---
+    match /user_secrets/{userId} {
+      // No client read/write access. Only backend functions.
+      allow read, write: if false;
+    }
+    
     match /products/{productId} {
+      // Any authenticated staff can read products
       allow read: if request.auth != null;
+      // Only admin/manager can write/update products
       allow write: if isAdminOrManager();
     }
+
     match /categories/{categoryId} {
       allow read: if request.auth != null;
       allow write: if isAdminOrManager();
     }
-    match /inventory_ledger/{ledgerId} {
-      allow read: if isAdminOrManager();
-      allow create: if isAdminOrManager();
-      allow update, delete: if false;
-    }
 
-    // --- Orders & Sales ---
     match /orders/{oid} {
       allow read: if request.auth != null;
+      allow create: if hasRole('admin') || hasRole('manager') || hasRole('cashier');
       allow update: if request.auth != null && (hasRole('admin') || hasRole('manager') || hasRole('cashier'));
-      allow create: if request.auth != null && (hasRole('admin') || hasRole('manager') || hasRole('cashier'));
-    }
-    
-    match /returns_ledger/{rid} {
-      allow read: if request.auth != null;
-      allow create: if isAdminOrManager() || hasRole('cashier');
-      allow update, delete: if false;
     }
 
-    // --- Time Clock & Sessions ---
-    match /time_clock/{tid} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null; // any staff can clock-in/out
-      allow update: if request.auth != null && (resource.data.userId == request.auth.uid || isAdminOrManager());
-      allow delete: if false;
+    match /inventory_ledger/{movementId} {
+      // Read-only for audit trail
+      allow read: if isAdminOrManager();
+      allow write: if false; // only functions can write
     }
 
     match /register_sessions/{sid} {
@@ -61,10 +52,29 @@ service cloud.firestore {
       allow delete: if false; // immutable bookkeeping
     }
     
+    match /register_sessions/{sid}/cash_movements/{mid} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && (hasRole('admin') || hasRole('manager') || hasRole('cashier'));
+      allow update, delete: if false; // immutable
+    }
+
     match /z_closures/{zid} {
       allow read: if request.auth != null;
       allow create: if isAdminOrManager();
       allow update, delete: if false; // idempotent; create-only
+    }
+
+    match /time_clock/{tid} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null; // any staff can clock-in/out
+      allow update: if request.auth != null && (resource.data.userId == request.auth.uid || isAdminOrManager());
+      allow delete: if false;
+    }
+    
+    match /returns_ledger/{rid} {
+      allow read: if request.auth != null;
+      allow create: if isAdminOrManager() || hasRole('cashier');
+      allow update, delete: if false;
     }
   }
 }

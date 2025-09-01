@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Sidebar,
@@ -47,11 +46,6 @@ const menuItems = [
   { href: '/dashboard/admin/timeclock', title: 'Time Clock', icon: Clock, roles: ['admin', 'manager', 'cashier', 'waiter', 'kitchen'] },
 ];
 
-const reportSubItems = [
-    { href: '/dashboard/admin/reports/timesheets', title: 'Timesheets Export' },
-    { href: '/dashboard/admin/close-day', title: 'Close Day (Z-Report)' },
-];
-
 export default function AdminLayout({
   children,
 }: {
@@ -78,7 +72,7 @@ export default function AdminLayout({
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
-                    isActive={pathname === item.href || (item.href === '/dashboard/admin/reports' && pathname.startsWith('/dashboard/admin/reports'))}
+                    isActive={pathname === item.href || (item.href === '/dashboard/admin/reports' && (pathname.startsWith('/dashboard/admin/reports') || pathname.startsWith('/dashboard/admin/close-day')))}
                     tooltip={item.title}
                   >
                     <Link href={item.href}>
