@@ -34,6 +34,8 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
+import { upsertUser } from '@/lib/functions/users';
+import { useToast } from '@/hooks/use-toast';
 
 const roles: Role[] = ['admin', 'manager', 'cashier', 'waiter', 'kitchen'];
 
@@ -63,6 +65,7 @@ interface UserFormDrawerProps {
 }
 
 export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole }: UserFormDrawerProps) {
+  const { toast } = useToast();
   const isEditing = !!user;
 
   const form = useForm<UserFormValues>({
@@ -98,8 +101,20 @@ export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole 
     }
   }, [user, form, isOpen]);
 
-  const onSubmit = (data: UserFormValues) => {
-    onSave(data);
+  const onSubmit = async (data: UserFormValues) => {
+    try {
+        await upsertUser({
+            id: data.id,
+            name: data.name,
+            role: data.role,
+            active: data.active,
+            hourlyRateZar: Number(data.hourlyRateZar) || 0,
+        });
+        toast({ title: 'User saved successfully' });
+        onClose();
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Save failed', description: error.message });
+    }
   };
   
   const canEditRole = currentUserRole === 'admin';
