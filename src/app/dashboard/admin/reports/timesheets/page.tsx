@@ -1,3 +1,4 @@
+
 'use client';
 import { useState } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -12,8 +13,8 @@ import { format, subDays } from 'date-fns';
 
 export default function Timesheets(){
   const { toast } = useToast();
-  const [start, setStart] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd\'T\'HH:mm'));
-  const [end, setEnd] = useState(format(new Date(), 'yyyy-MM-dd\'T\'HH:mm'));
+  const [start, setStart] = useState(new Date(Date.now()-7*864e5).toISOString());
+  const [end, setEnd] = useState(new Date().toISOString());
   const [locationId, setLocationId] = useState('');
   const [loading, setLoading] = useState(false);
   const fn = httpsCallable(getFunctions(app), 'adminExportTimeCsv');

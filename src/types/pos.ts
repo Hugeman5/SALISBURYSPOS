@@ -1,3 +1,4 @@
+
 import type { Timestamp } from 'firebase/firestore';
 
 export type Role = 'admin' | 'manager' | 'cashier' | 'waiter' | 'kitchen';
@@ -61,18 +62,6 @@ export interface RefundRequestLine {
   note?: string;
 }
 
-export interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  price: {
-    incCents: number;
-    taxRate: number;
-  };
-  stockOnHand?: number;
-  trackStock: boolean;
-  active: boolean;
-}
 
 export interface OrderItem {
   productId: string;
@@ -141,4 +130,74 @@ export interface Refund {
   originalOrderId: string;
   reason?: string;
   totalRefundAmount: number; // in cents
+}
+
+export interface MenuCategory {
+  id: string;
+  name: string;
+  color?: string;
+  order: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ModifierItem { id: string; name: string; priceDeltaCents: number; active: boolean }
+export interface ModifierGroup {
+  id: string;
+  name: string;
+  min: number; // min selections
+  max: number; // max selections (0 = unlimited)
+  items: ModifierItem[];
+  active: boolean;
+}
+
+export interface MenuItem {
+  id: string;
+  name: string;
+  sku?: string; // internal SKU
+  plu?: string; // keypad code
+  categoryId: string;
+  priceCents: number;
+  taxRate?: number; // percent, e.g. 15 for 15%
+  active: boolean;
+  imageUrl?: string;
+  tags?: string[];
+  modifierGroupIds?: string[];
+  availability?: { days?: number[]; from?: string; to?: string }; // 0-6 (Sun-Sat), HH:mm local
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type TableShape = 'rect'|'round';
+
+export interface FloorPlanTable {
+  id: string;
+  name: string; // e.g., T1
+  shape: TableShape;
+  x: number; y: number; // px in builder canvas
+  w: number; h: number; // px
+  seats: number;
+  zone?: string; // e.g., Patio, Inside
+  active: boolean;
+}
+
+export interface FloorPlan {
+  id: string;
+  locationId: string;
+  name: string;
+  width: number; height: number; // canvas size
+  tables: FloorPlanTable[];
+  updatedAt: string;
+}
+
+export interface TableState {
+  id: string;          // table id
+  locationId: string;
+  status: 'open'|'occupied'|'dirty'|'reserved'|'merged';
+  serverUserId?: string;
+  covers?: number;
+  orderId?: string;    // current dine-in order
+  mergedIntoId?: string; // if merged
+  updatedAt: string;
 }
