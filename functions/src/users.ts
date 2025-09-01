@@ -1,14 +1,13 @@
-
 /**
  * @fileoverview User and authentication management functions.
  */
 
-import {onCall, HttpsError, type CallableRequest} from "firebase-functions/v2/https";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as bcrypt from "bcryptjs";
 import {z} from "zod";
-import {db, requireRole, type Role} from "./utils";
+import {db, requireRole} from "./utils";
 
 const UpsertUserPayloadSchema = z.object({
   id: z.string().min(1),
@@ -24,7 +23,7 @@ const UpsertUserPayloadSchema = z.object({
  * @param {object} req The request object.
  * @return {Promise<{ok: true, id: string}>} A promise that resolves on success.
  */
-export const adminUpsertUser = onCall({cors: true}, async (req: CallableRequest) => {
+export const adminUpsertUser = onCall({cors: true}, async (req) => {
   const actorRole = requireRole(req, ["admin", "manager"]);
   const result = UpsertUserPayloadSchema.safeParse(req.data);
   if (!result.success) {
@@ -39,7 +38,8 @@ export const adminUpsertUser = onCall({cors: true}, async (req: CallableRequest)
 
   // Additional Validation
   if (isNew && !/^[a-z0-9-]{3,24}$/.test(data.id)) {
-    throw new HttpsError("invalid-argument", "On create, ID must be 3-24 lowercase letters, numbers, or hyphens.");
+    const msg = "On create, ID must be 3-24 lowercase letters/numbers/hyphens.";
+    throw new HttpsError("invalid-argument", msg);
   }
 
   if (actorRole !== "admin" && data.role === "admin") {
@@ -51,7 +51,7 @@ export const adminUpsertUser = onCall({cors: true}, async (req: CallableRequest)
 
   const hourlyRateCents = Math.round(data.hourlyRateZar * 100);
 
-  const userData: Record<string, any> = {
+  const userData: {[key: string]: unknown} = {
     name: data.name,
     nameLower: data.name.toLowerCase(),
     role: data.role,
@@ -67,7 +67,7 @@ export const adminUpsertUser = onCall({cors: true}, async (req: CallableRequest)
     await userRef.update(userData);
   }
 
-  return { ok: true, id: userId };
+  return {ok: true, id: userId};
 });
 
 /**
@@ -76,7 +76,7 @@ export const adminUpsertUser = onCall({cors: true}, async (req: CallableRequest)
  * @param {object} req The request object.
  * @return {Promise<{ok: true, id: string}>} A promise that resolves on success.
  */
-export const adminDeleteUser = onCall({cors: true}, async (req: CallableRequest) => {
+export const adminDeleteUser = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
   const {id} = z.object({id: z.string().min(1)}).parse(req.data);
   await db.collection("users").doc(id).update({active: false});
@@ -93,7 +93,7 @@ const SetPinPayloadSchema = z.object({
  * @param {object} req The request object.
  * @return {Promise<{ok: true}>} A promise that resolves on success.
  */
-export const adminSetUserPin = onCall({cors: true}, async (req: CallableRequest) => {
+export const adminSetUserPin = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
   const {id, pin} = SetPinPayloadSchema.parse(req.data);
 
@@ -106,8 +106,9 @@ export const adminSetUserPin = onCall({cors: true}, async (req: CallableRequest)
   // Ensure user exists in Firebase Auth, creating if necessary.
   try {
     await admin.auth().getUser(id);
-  } catch (error: any) {
-    if (error.code === "auth/user-not-found") {
+  } catch (error: unknown) {
+    const firebaseError = error as {code?: string; message?: string};
+    if (firebaseError.code === "auth/user-not-found") {
       functions.logger.info(`Creating new Firebase Auth user for ${id}`);
       const userData = userDoc.data();
       await admin.auth().createUser({
@@ -115,7 +116,7 @@ export const adminSetUserPin = onCall({cors: true}, async (req: CallableRequest)
         displayName: userData?.name || id,
       });
     } else {
-      throw new HttpsError("internal", error.message);
+      throw new HttpsError("internal", firebaseError.message || "Unknown auth error");
     }
   }
 

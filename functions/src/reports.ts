@@ -2,7 +2,7 @@
  * @fileoverview Cloud Functions for generating daily sales reports (Z-Reports).
  */
 
-import {onCall, HttpsError, type CallableRequest} from "firebase-functions/v2/https";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {Timestamp} from "firebase-admin/firestore";
 import {db, requireRole} from "./utils";
@@ -43,13 +43,12 @@ function saDayWindow(dateStr?: string) {
  * This is idempotent; running it multiple times for the same day will
  * overwrite the previous report with updated data.
  */
-export const adminCloseDay = onCall({cors: true}, async (req: CallableRequest) => {
+export const adminCloseDay = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
 
-  const {date, startMs: startOverride, endMs: endOverride} =
-    req.data as {date?: string, startMs?: number, endMs?: number};
+  const {date, startMs: startOverride, endMs: endOverride} = req.data;
   const window = saDayWindow(date);
   const startMs = startOverride ?? window.startMs;
   const endMs = endOverride ?? window.endMs;
@@ -84,8 +83,9 @@ export const adminCloseDay = onCall({cors: true}, async (req: CallableRequest) =
 
   // Round all monetary values to the nearest cent
   Object.keys(totals).forEach((k) => {
-    if (k !== "countPaid" && k !== "sampleSize") {
-      (totals as any)[k] = Math.round((totals as any)[k]);
+    const key = k as keyof typeof totals;
+    if (key !== "countPaid" && key !== "sampleSize") {
+      totals[key] = Math.round(totals[key]);
     }
   });
 
@@ -102,9 +102,9 @@ export const adminCloseDay = onCall({cors: true}, async (req: CallableRequest) =
 /**
  * Exports a previously generated Z-Report to a CSV string.
  */
-export const adminExportZCsv = onCall({cors: true}, async (req: CallableRequest) => {
+export const adminExportZCsv = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
-  const {date} = req.data as {date?: string};
+  const {date} = req.data;
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     throw new HttpsError("invalid-argument", "Date 'YYYY-MM-DD' is required.");
   }

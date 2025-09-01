@@ -2,7 +2,7 @@
  * @fileoverview Cloud Functions for inventory and stock management.
  */
 
-import {onCall, HttpsError, type CallableRequest} from "firebase-functions/v2/https";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {format} from "date-fns";
 import {db, requireRole} from "./utils";
@@ -11,21 +11,11 @@ import {db, requireRole} from "./utils";
 type MovementType = "receive" | "sale" | "refund" | "wastage" |
                     "adjust" | "set";
 
-/** Payload for the adminPostStockMovement function. */
-interface PostMovementPayload {
-  productId: string;
-  type: MovementType;
-  qty: number;
-  note?: string | null;
-  clientTxnId?: string | null;
-  adjustSign?: 1 | -1;
-}
-
 /**
  * Posts a stock movement to the inventory ledger and updates the product's
  * stock-on-hand count in a single transaction. Supports idempotency.
  */
-export const adminPostStockMovement = onCall({cors: true}, async (req: CallableRequest) => {
+export const adminPostStockMovement = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
   const uid = req.auth?.uid;
   if (!uid) {
@@ -33,7 +23,7 @@ export const adminPostStockMovement = onCall({cors: true}, async (req: CallableR
   }
 
   const actorName = req.auth?.token?.name || req.auth?.token?.email || uid;
-  const data = req.data as PostMovementPayload;
+  const data = req.data;
 
   // --- Validation ---
   if (!data.productId) {
@@ -108,20 +98,12 @@ export const adminPostStockMovement = onCall({cors: true}, async (req: CallableR
   return {ok: true, before, after, delta, ledgerId: ledgerRef.id};
 });
 
-/** Payload for the adminExportLedger function. */
-interface ExportLedgerPayload {
-  productId?: string;
-  type?: MovementType;
-  fromTs?: string | number;
-  toTs?: string | number;
-}
-
 /**
  * Exports the inventory ledger to a CSV file, with optional filters.
  */
-export const adminExportLedger = onCall({cors: true}, async (req: CallableRequest) => {
+export const adminExportLedger = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
-  const data = req.data as ExportLedgerPayload;
+  const data = req.data;
   const {productId, type, fromTs, toTs} = data;
   const rangeFrom = fromTs ? new Date(fromTs) : undefined;
   const rangeTo = toTs ? new Date(toTs) : undefined;

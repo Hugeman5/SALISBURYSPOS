@@ -1,7 +1,6 @@
-
 /**
  * @fileoverview Main entry point for all Firebase Cloud Functions.
- * This file exports all the callable functions, making them available to clients.
+ * This file exports all the callable functions, making them available.
  */
 
 // Products and Inventory Management

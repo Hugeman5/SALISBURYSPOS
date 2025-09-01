@@ -2,7 +2,7 @@
  * @fileoverview Cloud Functions for product and category management.
  */
 
-import {onCall, HttpsError, type CallableRequest} from "firebase-functions/v2/https";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {db, requireRole} from "./utils";
 
@@ -32,7 +32,7 @@ function toExCents(incCents: number, taxRate: number): number {
 /**
  * Finds a category by its lowercase name or creates it if it doesn't exist.
  * @param {string | null | undefined} name The category name.
- * @return {Promise<{id: string | null, name: string | null}>} The category ID.
+ * @return {Promise<{id: string | null, name: string | null}>} The category.
  */
 async function getOrCreateCategoryByName(name?: string | null) {
   if (!name) return {id: null as string | null, name: null as string | null};
@@ -128,22 +128,22 @@ async function upsertProductCore(input: UpsertInput) {
 }
 
 /** Callable to upsert a single product. */
-export const adminUpsertProduct = onCall({cors: true}, async (req: CallableRequest) => {
+export const adminUpsertProduct = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
-  return upsertProductCore(req.data as UpsertInput);
+  return upsertProductCore(req.data);
 });
 
 /** Callable to delete a single product. */
-export const adminDeleteProduct = onCall({cors: true}, async (req: CallableRequest) => {
+export const adminDeleteProduct = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin"]);
-  const {id} = req.data as {id?: string};
+  const {id} = req.data;
   if (!id) throw new HttpsError("invalid-argument", "Product ID is required.");
   await db.collection("products").doc(id).delete();
   return {ok: true};
 });
 
 /** Callable to export all products to a CSV string. */
-export const adminExportProducts = onCall({cors: true}, async (req: CallableRequest) => {
+export const adminExportProducts = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
   const snap = await db.collection("products").orderBy("nameLower").get();
   const rows: string[] = [
@@ -166,9 +166,9 @@ export const adminExportProducts = onCall({cors: true}, async (req: CallableRequ
 });
 
 /** Callable to bulk import products from a CSV string. */
-export const adminBulkImportProducts = onCall({cors: true}, async (req: CallableRequest) => {
+export const adminBulkImportProducts = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
-  const csv: string = (req.data as {csv?: string})?.csv || "";
+  const csv: string = req.data?.csv || "";
   if (!csv) throw new HttpsError("invalid-argument", "CSV data is required.");
 
   const lines = csv.trim().split(/\r?\n/);

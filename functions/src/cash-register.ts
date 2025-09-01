@@ -2,7 +2,7 @@
  * @fileoverview Cloud Functions for cash register session management.
  */
 
-import {onCall, HttpsError, type CallableRequest} from "firebase-functions/v2/https";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {db, requireRole} from "./utils";
 
@@ -10,19 +10,13 @@ import {db, requireRole} from "./utils";
  * Manages cash register sessions (opening and closing).
  * This function is dispatched based on the 'action' property in the payload.
  */
-export const manageRegisterSession = onCall({cors: true}, async (req: CallableRequest) => {
+export const manageRegisterSession = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
 
   const actorName = req.auth?.token?.name || req.auth?.token?.email || uid;
-  const {action, registerId, openingFloat, sessionId, countedCash} = req.data as {
-      action?: "open" | "close";
-      registerId?: string;
-      openingFloat?: number;
-      sessionId?: string;
-      countedCash?: number;
-    };
+  const {action, registerId, openingFloat, sessionId, countedCash} = req.data;
 
   if (action === "open") {
     if (!registerId || typeof openingFloat !== "number" ||
@@ -85,18 +79,13 @@ export const manageRegisterSession = onCall({cors: true}, async (req: CallableRe
  * Records a cash movement (pay-in or pay-out) for an open session.
  * This function transactionally updates the session's expected cash total.
  */
-export const postCashMovement = onCall({cors: true}, async (req: CallableRequest) => {
+export const postCashMovement = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
 
   const actorName = req.auth?.token?.name || req.auth?.token?.email || uid;
-  const {sessionId, type, amount, reason} = req.data as {
-    sessionId?: string;
-    type?: "payin" | "payout";
-    amount?: number;
-    reason?: string;
-  };
+  const {sessionId, type, amount, reason} = req.data;
 
   if (!sessionId || !type || typeof amount !== "number" || !reason) {
     throw new HttpsError("invalid-argument", "Missing required fields.");
