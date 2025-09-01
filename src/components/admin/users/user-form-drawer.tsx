@@ -122,7 +122,7 @@ export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole 
                 <FormItem>
                   <FormLabel>User ID</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. john-doe" {...field} disabled={isEditing} />
+                    <Input id="id" name="id" autoComplete="username" placeholder="e.g. john-doe" {...field} disabled={isEditing} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -135,7 +135,7 @@ export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole 
                 <FormItem>
                   <FormLabel>Full Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. John Doe" {...field} />
+                    <Input id="name" name="name" autoComplete="name" placeholder="e.g. John Doe" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -147,9 +147,9 @@ export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole 
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Role</FormLabel>
-                   <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!canEditRole}>
+                   <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!canEditRole} name="role" autoComplete="organization-title">
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger id="role">
                         <SelectValue placeholder="Select a role" />
                       </SelectTrigger>
                     </FormControl>
@@ -171,7 +171,7 @@ export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole 
                 <FormItem>
                   <FormLabel>Hourly Rate (ZAR)</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" placeholder="e.g., 120.50" {...field} />
+                    <Input id="hourlyRateZAR" name="hourlyRateZAR" autoComplete="off" type="number" step="0.01" placeholder="e.g., 120.50" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -190,6 +190,9 @@ export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole 
                     </div>
                      <FormControl>
                         <Switch
+                          id="active"
+                          name="active"
+                          autoComplete="off"
                           checked={field.value}
                           onCheckedChange={field.onChange}
                         />

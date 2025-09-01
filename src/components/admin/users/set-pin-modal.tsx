@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { PinKeypad } from '@/components/pin-keypad';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { call } from '@/lib/functions/call';
+import { setUserPin } from '@/lib/functions/users';
 
 interface SetPinModalProps {
   user: User;
@@ -60,7 +60,7 @@ export function SetPinModal({ user, onClose }: SetPinModalProps) {
     
     setProcessing(true);
     try {
-      await call('adminSetUserPin', { id: user.id, pin });
+      await setUserPin({ id: user.id, pin });
       toast({
         title: 'PIN Updated Successfully',
         description: `PIN for ${user.name} has been set.`,
