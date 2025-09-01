@@ -59,12 +59,12 @@ export type UserFormValues = z.infer<typeof userFormSchema>;
 interface UserFormDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: UserFormValues) => Promise<void>;
+  onSaveSuccess: () => void;
   user: User | null;
   currentUserRole?: Role | null;
 }
 
-export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole }: UserFormDrawerProps) {
+export function UserFormDrawer({ isOpen, onClose, onSaveSuccess, user, currentUserRole }: UserFormDrawerProps) {
   const { toast } = useToast();
   const isEditing = !!user;
 
@@ -111,7 +111,7 @@ export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole 
             hourlyRateZar: Number(data.hourlyRateZar) || 0,
         });
         toast({ title: 'User saved successfully' });
-        onClose();
+        onSaveSuccess();
     } catch (error: any) {
         toast({ variant: 'destructive', title: 'Save failed', description: error.message });
     }
@@ -135,9 +135,9 @@ export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole 
               name="id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>User ID</FormLabel>
+                  <FormLabel htmlFor="user-id">User ID</FormLabel>
                   <FormControl>
-                    <Input id="id" name="id" autoComplete="username" placeholder="e.g. john-doe" {...field} disabled={isEditing} />
+                    <Input id="user-id" autoComplete="username" placeholder="e.g. john-doe" {...field} disabled={isEditing} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -148,9 +148,9 @@ export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole 
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Full Name</FormLabel>
+                  <FormLabel htmlFor="user-name">Full Name</FormLabel>
                   <FormControl>
-                    <Input id="name" name="name" autoComplete="name" placeholder="e.g. John Doe" {...field} />
+                    <Input id="user-name" autoComplete="name" placeholder="e.g. John Doe" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -161,10 +161,10 @@ export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole 
               name="role"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Role</FormLabel>
+                  <FormLabel htmlFor="user-role">Role</FormLabel>
                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!canEditRole} name="role" autoComplete="organization-title">
                     <FormControl>
-                      <SelectTrigger id="role">
+                      <SelectTrigger id="user-role">
                         <SelectValue placeholder="Select a role" />
                       </SelectTrigger>
                     </FormControl>
@@ -184,9 +184,9 @@ export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole 
               name="hourlyRateZar"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Hourly Rate (ZAR)</FormLabel>
+                  <FormLabel htmlFor="hourly-rate">Hourly Rate (ZAR)</FormLabel>
                   <FormControl>
-                    <Input id="hourlyRateZAR" name="hourlyRateZAR" autoComplete="off" type="number" step="0.01" placeholder="e.g., 120.50" {...field} />
+                    <Input id="hourly-rate" autoComplete="off" type="number" step="0.01" min="0" inputMode="decimal" placeholder="e.g., 120.50" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -198,15 +198,14 @@ export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole 
               render={({ field }) => (
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
-                        <FormLabel>Active Status</FormLabel>
+                        <FormLabel htmlFor="user-active">Active Status</FormLabel>
                         <p className="text-xs text-muted-foreground">
                             Inactive users cannot log in.
                         </p>
                     </div>
                      <FormControl>
                         <Switch
-                          id="active"
-                          name="active"
+                          id="user-active"
                           autoComplete="off"
                           checked={field.value}
                           onCheckedChange={field.onChange}

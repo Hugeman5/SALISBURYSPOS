@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview User and authentication management functions.
  */
@@ -66,7 +67,7 @@ export const adminUpsertUser = onCall({cors: true}, async (req: CallableRequest)
     await userRef.update(userData);
   }
 
-  return {ok: true, id: userId};
+  return { ok: true, id: userId };
 });
 
 /**

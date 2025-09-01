@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -13,7 +14,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { call } from "@/lib/functions/call";
+import { adminBulkImportProducts, adminDeleteProduct, adminExportProducts, adminUpsertProduct } from "@/lib/functions/products";
 
 type Product = {
   id: string;
@@ -91,7 +92,7 @@ export default function ProductsPage() {
         taxRate: (edit as any).price?.taxRate ?? 0.15,
       };
       
-      await call("adminUpsertProduct", payload);
+      await adminUpsertProduct(payload);
       toast({ title: 'Product saved' });
       setEdit(null);
       await load();
@@ -106,7 +107,7 @@ export default function ProductsPage() {
     if (!confirm) return;
     setIsDeleting(true);
     try {
-        await call("adminDeleteProduct", { id: confirm.id });
+        await adminDeleteProduct({ id: confirm.id });
         toast({ title: 'Product deleted' });
         setConfirm(null);
         await load();
@@ -119,7 +120,7 @@ export default function ProductsPage() {
 
   async function onExport() {
     try {
-        const res = await call<{ csv: string }, any>("adminExportProducts", {});
+        const res = await adminExportProducts({});
         const csv = res.csv;
         const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
         const url = URL.createObjectURL(blob);
@@ -285,7 +286,7 @@ function CSVImport({ onImported }: { onImported: ()=>void }) {
     setBusy(true);
     try {
       const text = await files[0].text();
-      const res: any = await call("adminBulkImportProducts", { csv: text });
+      const res = await adminBulkImportProducts({ csv: text });
       
       toast({
         title: "Import Complete",

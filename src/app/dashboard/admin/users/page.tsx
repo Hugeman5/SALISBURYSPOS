@@ -13,11 +13,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreHorizontal, UserPlus, Search } from 'lucide-react';
 import { useAuth } from '@/stores/auth-store';
 import { Input } from '@/components/ui/input';
-import { UserFormDrawer, UserFormValues } from '@/components/admin/users/user-form-drawer';
+import { UserFormDrawer } from '@/components/admin/users/user-form-drawer';
 import { SetPinModal } from '@/components/admin/users/set-pin-modal';
 import { useToast } from '@/hooks/use-toast';
 import { fmtZAR } from '@/utils/money';
-import { deleteUser, upsertUser } from '@/lib/functions/users';
+import { deleteUser } from '@/lib/functions/users';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -33,7 +33,13 @@ export default function UsersPage() {
   const canEdit = currentUserRole === 'admin' || currentUserRole === 'manager';
 
   useEffect(() => {
-    const q = query(collection(db, 'users'), orderBy('name'));
+    // Realtime list of users for Admin UI
+    const q = query(
+        collection(db, 'users'), 
+        where("active","==",true), 
+        orderBy("role"), 
+        orderBy("name")
+    );
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const usersData: User[] = [];
       querySnapshot.forEach((doc) => {
@@ -62,22 +68,10 @@ export default function UsersPage() {
     }
   };
 
-  const handleSaveUser = async (data: UserFormValues) => {
-    try {
-      await upsertUser({
-          id: data.id,
-          name: data.name,
-          role: data.role,
-          active: data.active,
-          hourlyRateZar: Number(data.hourlyRateZar) || 0,
-      });
-      toast({ title: 'User saved successfully' });
-      setDrawerOpen(false);
-      setEditingUser(null);
-    } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Save failed', description: error.message });
-    }
-  };
+  const handleSaveSuccess = () => {
+    setDrawerOpen(false);
+    setEditingUser(null);
+  }
 
   const openDrawerForEdit = (user: User) => {
     setEditingUser(user);
@@ -91,7 +85,8 @@ export default function UsersPage() {
 
   const filteredUsers = useMemo(() => {
     return users.filter(user =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase())
+      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.role.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [users, searchTerm]);
 
@@ -124,7 +119,7 @@ export default function UsersPage() {
             <div className="relative pt-4">
               <Search className="absolute left-2.5 top-6 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name..."
+                placeholder="Search by name or role..."
                 className="pl-8"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -194,8 +189,8 @@ export default function UsersPage() {
       </div>
       <UserFormDrawer
         isOpen={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        onSave={handleSaveUser}
+        onClose={() => { setDrawerOpen(false); setEditingUser(null); }}
+        onSaveSuccess={handleSaveSuccess}
         user={editingUser}
         currentUserRole={currentUserRole}
       />
