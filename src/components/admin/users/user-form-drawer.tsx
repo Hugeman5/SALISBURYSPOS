@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { upsertUser } from '@/lib/functions/users';
 
 const roles: Role[] = ['admin', 'manager', 'cashier', 'waiter', 'kitchen'];
 
@@ -56,7 +57,7 @@ export type UserFormValues = z.infer<typeof userFormSchema>;
 interface UserFormDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: UserFormValues) => void;
+  onSave: (data: UserFormValues) => Promise<void>;
   user: User | null;
   currentUserRole?: Role | null;
 }
@@ -200,7 +201,10 @@ export function UserFormDrawer({ isOpen, onClose, onSave, user, currentUserRole 
               <SheetClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
               </SheetClose>
-              <Button type="submit">Save Changes</Button>
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                Save Changes
+              </Button>
             </SheetFooter>
           </form>
         </Form>

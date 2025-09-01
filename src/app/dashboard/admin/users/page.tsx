@@ -17,7 +17,7 @@ import { UserFormDrawer, UserFormValues } from '@/components/admin/users/user-fo
 import { SetPinModal } from '@/components/admin/users/set-pin-modal';
 import { useToast } from '@/hooks/use-toast';
 import { fmtZAR } from '@/utils/money';
-import { call } from '@/lib/functions/call';
+import { deleteUser, upsertUser } from '@/lib/functions/users';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -54,7 +54,7 @@ export default function UsersPage() {
     if (!canDelete) return;
     if (confirm(`Are you sure you want to set user "${user.name}" to inactive? They will no longer be able to log in.`)) {
       try {
-        await call('adminDeleteUser', { id: user.id });
+        await deleteUser({ id: user.id });
         toast({ title: 'User set to inactive' });
       } catch (error: any) {
         toast({ variant: 'destructive', title: 'Update failed', description: error.message });
@@ -64,13 +64,12 @@ export default function UsersPage() {
 
   const handleSaveUser = async (data: UserFormValues) => {
     try {
-      await call('adminUpsertUser', {
+      await upsertUser({
           id: data.id,
           name: data.name,
           role: data.role,
           active: data.active,
           hourlyRateZar: Number(data.hourlyRateZar) || 0,
-          isNew: !editingUser,
       });
       toast({ title: 'User saved successfully' });
       setDrawerOpen(false);
