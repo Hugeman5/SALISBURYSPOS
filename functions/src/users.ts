@@ -1,4 +1,3 @@
-
 /**
  * @fileoverview User and authentication management functions.
  */

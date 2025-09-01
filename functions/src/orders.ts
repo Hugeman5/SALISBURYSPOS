@@ -1,4 +1,3 @@
-
 /**
  * @fileoverview Cloud Functions for order management and processing.
  */

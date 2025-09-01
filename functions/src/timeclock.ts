@@ -1,4 +1,3 @@
-
 /**
  * @fileoverview Cloud Functions for employee time clock management.
  */

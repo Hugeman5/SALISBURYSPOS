@@ -16,13 +16,15 @@ export const manageRegisterSession = onCall({cors: true}, async (req: CallableRe
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
 
   const actorName = req.auth?.token?.name || req.auth?.token?.email || uid;
-  const {action} = req.data as {action?: "open" | "close"};
-
-  if (action === "open") {
-    const {registerId, openingFloat} = req.data as {
+  const {action, registerId, openingFloat, sessionId, countedCash} = req.data as {
+      action?: "open" | "close";
       registerId?: string;
       openingFloat?: number;
+      sessionId?: string;
+      countedCash?: number;
     };
+
+  if (action === "open") {
     if (!registerId || typeof openingFloat !== "number" ||
         isNaN(openingFloat)) {
       throw new HttpsError(
@@ -39,21 +41,17 @@ export const manageRegisterSession = onCall({cors: true}, async (req: CallableRe
       );
     }
 
-    const sessionRef = db.collection("register_sessions").doc();
-    await sessionRef.set({
+    const newSessionRef = db.collection("register_sessions").doc();
+    await newSessionRef.set({
       registerId, status: "open",
       openedAt: admin.firestore.FieldValue.serverTimestamp(),
       openedBy: {uid, name: actorName},
       openingFloat, expectedCash: openingFloat,
     });
-    return {ok: true, sessionId: sessionRef.id};
+    return {ok: true, sessionId: newSessionRef.id};
   }
 
   if (action === "close") {
-    const {sessionId, countedCash} = req.data as {
-      sessionId?: string;
-      countedCash?: number;
-    };
     if (!sessionId || typeof countedCash !== "number" || isNaN(countedCash)) {
       throw new HttpsError(
         "invalid-argument", "Session ID and counted cash are required."
