@@ -7,7 +7,7 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as bcrypt from "bcryptjs";
 import {z} from "zod";
-import {db, requireRole} from "./utils";
+import {db, requireRole, type Role} from "./utils";
 
 const UpsertUserPayloadSchema = z.object({
   id: z.string().min(1),
@@ -66,7 +66,7 @@ export const adminUpsertUser = onCall({cors: true}, async (req: CallableRequest)
     await userRef.update(userData);
   }
 
-  return {ok: true, id: userId};
+  return { ok: true, id: userId };
 });
 
 /**
@@ -78,8 +78,8 @@ export const adminUpsertUser = onCall({cors: true}, async (req: CallableRequest)
 export const adminDeleteUser = onCall({cors: true}, async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   const {id} = z.object({id: z.string().min(1)}).parse(req.data);
-  await db.collection("users").doc(id).update({active: false});
-  return {ok: true, id};
+  await db.collection("users").doc(id).update({ active: false });
+  return { ok: true, id };
 });
 
 const SetPinPayloadSchema = z.object({
@@ -131,5 +131,5 @@ export const adminSetUserPin = onCall({cors: true}, async (req: CallableRequest)
       {merge: true}
     );
 
-  return {ok: true};
+  return { ok: true };
 });
