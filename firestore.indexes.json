@@ -85,13 +85,6 @@
       ]
     },
     {
-      "collectionGroup": "time_clock",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "inAt", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "register_sessions",
       "queryScope": "COLLECTION",
       "fields": [
