@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth, attachAuthListenerOnce } from '@/stores/auth-store';
 import { useRouter } from 'next/navigation';
 import type { Role } from '@/types';
+import { PinKeypad } from '@/components/pin-keypad';
 
 type LoginableUser = { id: string; name: string; role: Role; };
 
