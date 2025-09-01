@@ -1,7 +1,5 @@
-/**
- * @fileoverview Main entry point for all Firebase Cloud Functions.
- * This file exports all the callable functions, making them available.
- */
+import * as admin from 'firebase-admin';
+if (!admin.apps.length) admin.initializeApp();
 
 // Products and Inventory Management
 export {
@@ -28,20 +26,20 @@ export {
   cashierSetItems,
   cashierTakePayment,
   cashierCloseOrder,
-  cashierRefundItems,
 } from "./orders";
+export { cashierRefundItems } from './cashierRefundItems';
+
 
 // Reporting
-export {
-  adminCloseDay,
-  adminExportZCsv,
-} from "./reports";
+export { adminCloseDay } from './adminCloseDay';
+export { adminExportZCsv } from "./reports";
+export { adminExportTimeCsv } from './adminExportTimeCsv';
+
 
 // Employee Time Clock
 export {
   clockIn,
   clockOut,
-  adminExportTimeCsv,
 } from "./timeclock";
 
 // Cash Register Management

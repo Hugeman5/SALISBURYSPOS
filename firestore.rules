@@ -1,106 +1,70 @@
 rules_version = '2';
-
 service cloud.firestore {
-  /** ---------- Role helpers ---------- */
-  function isSignedIn() {
-    return request.auth != null;
-  }
-  function isAdmin() {
-    return isSignedIn() && request.auth.token.role == 'admin';
-  }
-  function isManager() {
-    return isSignedIn() &&
-      (request.auth.token.role == 'manager' || request.auth.token.role == 'admin');
-  }
-  function isCashier() {
-    return isSignedIn() && request.auth.token.role == 'cashier';
-  }
-  function isStaff() {
-    return isAdmin() || isManager() || isCashier();
-  }
-
   match /databases/{database}/documents {
-
-    /** ---------- Users (public read for login list) ---------- */
-    match /users/{uid} {
-      // safe to read for login list (no secrets here)
-      allow read: if true;
-      // write via Cloud Functions; allow UI writes only for mgr/admin if needed
-      allow create, update, delete: if isManager();
+    
+    function hasRole(r) {
+      return request.auth.token.role == r;
+    }
+    function isAdminOrManager() {
+      return hasRole('admin') || hasRole('manager');
     }
 
-    /** ---------- Secrets (PIN hashes) — server-only ---------- */
-    match /user_secrets/{uid} {
-      allow read, write: if false;
+    // --- Users & Secrets ---
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if isAdminOrManager();
     }
-
-    /** ---------- Products & Categories ---------- */
+    match /user_secrets/{userId} {
+      allow read, write: if false; // Only accessible by backend functions
+    }
+    
+    // --- Products & Inventory ---
     match /products/{productId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isManager();
+      allow read: if request.auth != null;
+      allow write: if isAdminOrManager();
     }
-
     match /categories/{categoryId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isManager();
+      allow read: if request.auth != null;
+      allow write: if isAdminOrManager();
+    }
+    match /inventory_ledger/{ledgerId} {
+      allow read: if isAdminOrManager();
+      allow create: if isAdminOrManager();
+      allow update, delete: if false;
     }
 
-    /** ---------- Inventory ledger (server writes only) ---------- */
-    match /inventory_ledger/{entryId} {
-      allow read: if isManager();
-      allow create, update, delete: if false;
+    // --- Orders & Sales ---
+    match /orders/{oid} {
+      allow read: if request.auth != null;
+      allow update: if request.auth != null && (hasRole('admin') || hasRole('manager') || hasRole('cashier'));
+      allow create: if request.auth != null && (hasRole('admin') || hasRole('manager') || hasRole('cashier'));
+    }
+    
+    match /returns_ledger/{rid} {
+      allow read: if request.auth != null;
+      allow create: if isAdminOrManager() || hasRole('cashier');
+      allow update, delete: if false;
     }
 
-    /** ---------- Orders (server writes; clients read) ---------- */
-    match /orders/{orderId} {
-      allow read: if isStaff();
-      allow create, update, delete: if false;
-
-      // If you later add subcollections (e.g., refunds)
-      match /refunds/{refundId} {
-        allow read: if isStaff();
-        allow create, update, delete: if false;
-      }
+    // --- Time Clock & Sessions ---
+    match /time_clock/{tid} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null; // any staff can clock-in/out
+      allow update: if request.auth != null && (resource.data.userId == request.auth.uid || isAdminOrManager());
+      allow delete: if false;
     }
 
-    /** ---------- Register sessions & cash movements ---------- */
-    match /register_sessions/{sessionId} {
-      allow read: if isStaff();
-      allow create, update, delete: if false;
-
-      match /cash_movements/{movementId} {
-        allow read: if isStaff();
-        allow create, update, delete: if false;
-      }
+    match /register_sessions/{sid} {
+      allow read: if request.auth != null; // visible to signed-in staff
+      allow create: if request.auth != null && (hasRole('admin') || hasRole('manager') || hasRole('cashier'));
+      allow update: if isAdminOrManager() || (hasRole('cashier') && request.resource.data.status == 'closed');
+      allow delete: if false; // immutable bookkeeping
     }
-
-    /** ---------- Time clock (server writes; staff read) ---------- */
-    match /time_clock/{sessionId} {
-      allow read: if isStaff();
-      allow create, update, delete: if false;
-    }
-
-    /** (Optional) sessions collection if you use it elsewhere */
-    match /sessions/{id} {
-      allow read: if isStaff();
-      allow create, update, delete: if false;
-    }
-
-    /** ---------- Z-closures (server writes; mgr/admin read) ---------- */
-    match /z_closures/{dateKey} {
-      allow read: if isManager();
-      allow create, update, delete: if false;
-    }
-
-    /** ---------- Settings (read-only for now) ---------- */
-    match /settings/{docId} {
-      allow read: if isStaff();
-      allow create, update, delete: if false;
-    }
-
-    /** ---------- Default deny ---------- */
-    match /{document=**} {
-      allow read, write: if false;
+    
+    match /z_closures/{zid} {
+      allow read: if request.auth != null;
+      allow create: if isAdminOrManager();
+      allow update, delete: if false; // idempotent; create-only
     }
   }
 }

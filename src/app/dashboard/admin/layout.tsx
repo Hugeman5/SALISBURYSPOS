@@ -22,6 +22,7 @@ import {
   Clock,
   Home,
   ShoppingCart,
+  Moon,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { LogoutButton } from '@/components/auth/logout-button';
@@ -44,6 +45,11 @@ const menuItems = [
   { href: '/dashboard/admin/users', title: 'Users & Roles', icon: Users, roles: ['admin', 'manager'] },
   { href: '/dashboard/admin/reports', title: 'Reports', icon: BarChart3, roles: ['admin', 'manager'] },
   { href: '/dashboard/admin/timeclock', title: 'Time Clock', icon: Clock, roles: ['admin', 'manager', 'cashier', 'waiter', 'kitchen'] },
+];
+
+const reportSubItems = [
+    { href: '/dashboard/admin/reports/timesheets', title: 'Timesheets Export' },
+    { href: '/dashboard/admin/close-day', title: 'Close Day (Z-Report)' },
 ];
 
 export default function AdminLayout({
@@ -72,7 +78,7 @@ export default function AdminLayout({
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
-                    isActive={pathname === item.href}
+                    isActive={pathname === item.href || (item.href === '/dashboard/admin/reports' && pathname.startsWith('/dashboard/admin/reports'))}
                     tooltip={item.title}
                   >
                     <Link href={item.href}>
