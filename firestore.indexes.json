@@ -1,160 +1,36 @@
-
 {
   "indexes": [
     {
-      "collectionGroup": "users",
+      "collectionGroup": "menu_screens",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "active", "order": "ASCENDING" },
-        { "fieldPath": "name",   "order": "ASCENDING" }
+        { "fieldPath": "menuId", "order": "ASCENDING" },
+        { "fieldPath": "order",  "order": "ASCENDING" }
       ]
     },
     {
-      "collectionGroup": "users",
+      "collectionGroup": "menu_buttons",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "active", "order": "ASCENDING" },
-        { "fieldPath": "role",   "order": "ASCENDING" },
-        { "fieldPath": "name",   "order": "ASCENDING" }
+        { "fieldPath": "menuId",  "order": "ASCENDING" },
+        { "fieldPath": "screenId","order": "ASCENDING" },
+        { "fieldPath": "order",   "order": "ASCENDING" }
       ]
     },
     {
-      "collectionGroup": "products",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "categoryId", "order": "ASCENDING" },
-        { "fieldPath": "active",     "order": "ASCENDING" },
-        { "fieldPath": "name",       "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "products",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "active", "order": "ASCENDING" },
-        { "fieldPath": "name",   "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "products",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "trackStock", "order": "ASCENDING" },
-        { "fieldPath": "name",       "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "orders",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status",    "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "orders",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status",    "order": "ASCENDING" },
-        { "fieldPath": "closedAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "inventory_ledger",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "type", "order": "ASCENDING" },
-        { "fieldPath": "ts",   "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "inventory_ledger",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "productId", "order": "ASCENDING" },
-        { "fieldPath": "ts",        "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "time_clock",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "inAt", "order": "ASCENDING" },
-        { "fieldPath": "outAt", "order": "ASCENDING" }
-      ]
-    },
-     {
-      "collectionGroup": "time_clock",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "inAt", "order": "DESCENDING" },
-        { "fieldPath": "outAt", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "register_sessions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "openedAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "register_sessions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "closedAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "register_sessions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {"fieldPath": "locationId", "order": "ASCENDING"},
-        {"fieldPath": "openedAt", "order": "DESCENDING"},
-        {"fieldPath": "status", "order": "ASCENDING"}
-      ]
-    },
-    {
-      "collectionGroup": "cash_movements",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "sessionId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "z_closures",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "date", "order": "ASCENDING" },
-        { "fieldPath": "locationId", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "menu_categories",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "active", "order": "ASCENDING" },
-        { "fieldPath": "order", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "menu_items",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "categoryId", "order": "ASCENDING" },
-        { "fieldPath": "active", "order": "DESCENDING" },
-        { "fieldPath": "name", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "table_state",
+      "collectionGroup": "floor_plans",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "locationId", "order": "ASCENDING" },
-        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+        { "fieldPath": "updatedAt",  "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "items",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "active", "order": "DESCENDING" },
+        { "fieldPath": "name",   "order": "ASCENDING" }
       ]
     }
   ],
