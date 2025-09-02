@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Sidebar,
@@ -25,6 +24,7 @@ import {
   Moon,
   Sheet,
   PenSquare,
+  Map,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { LogoutButton } from '@/components/auth/logout-button';
@@ -39,7 +39,8 @@ const menuItems = [
   { href: '/dashboard/admin/menu', title: 'Menu Builder', icon: PenSquare, roles: ['admin', 'manager'] },
   { href: '/dashboard/admin/products', title: 'Products', icon: Package, roles: ['admin', 'manager'] },
   { href: '/dashboard/admin/inventory', title: 'Inventory', icon: LayoutGrid, roles: ['admin', 'manager'] },
-  { href: '/dashboard/admin/floor-builder', title: 'Floor Plan', icon: Sheet, roles: ['admin', 'manager'] },
+  { href: '/dashboard/admin/floor-builder', title: 'Floor Plan', icon: Map, roles: ['admin', 'manager'] },
+  { href: '/dashboard/admin/cashier/floor', title: 'Live Floor', icon: Sheet, roles: ['admin', 'manager', 'cashier', 'waiter']},
   {
     href: '/dashboard/admin/cash-register',
     title: 'Cash Register',

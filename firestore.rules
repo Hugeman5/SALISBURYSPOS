@@ -1,95 +1,145 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    function hasRole(r) {
-      return request.auth.token.role == r;
+    function isSignedIn() {
+      return request.auth != null;
     }
-    function isAdminOrManager() {
-      return hasRole('admin') || hasRole('manager');
+    
+    function hasRole(role) {
+      return isSignedIn() && request.auth.token.role == role;
+    }
+    
+    function isOneOfRoles(roles) {
+      return isSignedIn() && request.auth.token.role in roles;
+    }
+    
+    function isAdmin() {
+      return hasRole('admin');
     }
 
+    function isAdminOrManager() {
+      return isOneOfRoles(['admin', 'manager']);
+    }
+
+    function isStaff() {
+      return isOneOfRoles(['admin', 'manager', 'cashier', 'waiter', 'kitchen']);
+    }
+
+    // --- User Data ---
     match /users/{userId} {
-      allow read: if request.auth != null;
+      allow read: if isStaff();
       allow write: if isAdminOrManager();
     }
     
     match /user_secrets/{userId} {
-      allow read, write: if false; // Only accessible by backend
-    }
-
-    match /products/{productId} {
-      allow read: if request.auth != null;
-      allow write: if isAdminOrManager();
-    }
-
-    match /categories/{categoryId} {
-      allow read: if request.auth != null;
-      allow write: if isAdminOrManager();
+      allow read, write: if false; // Only accessible by backend functions
     }
     
-    match /orders/{orderId} {
-      allow read: if request.auth != null;
-      allow create, update: if hasRole('admin') || hasRole('manager') || hasRole('cashier');
-    }
-
+    // --- POS Operations ---
     match /register_sessions/{sid} {
-      allow read: if request.auth != null;
-      allow create: if hasRole('admin') || hasRole('manager') || hasRole('cashier');
+      allow read: if isStaff();
+      allow create: if isOneOfRoles(['admin', 'manager', 'cashier']);
       allow update: if isAdminOrManager() || (hasRole('cashier') && request.resource.data.status == 'closed');
       allow delete: if false;
     }
-    
+
     match /cash_movements/{mid} {
-      allow read: if request.auth != null;
-      allow create: if hasRole('admin') || hasRole('manager') || hasRole('cashier');
+      allow read: if isStaff();
+      allow create: if isOneOfRoles(['admin', 'manager', 'cashier']);
       allow update, delete: if false;
     }
 
     match /z_closures/{zid} {
-      allow read: if request.auth != null;
+      allow read: if isStaff();
       allow create: if isAdminOrManager();
       allow update, delete: if false;
     }
 
-    match /time_clock/{tid} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && (resource.data.userId == request.auth.uid || isAdminOrManager());
-      allow delete: if false;
+    match /orders/{oid} {
+      allow read: if isStaff();
+      allow create, update: if isOneOfRoles(['admin', 'manager', 'cashier', 'waiter']);
     }
 
     match /returns_ledger/{rid} {
-      allow read: if request.auth != null;
-      allow create: if isAdminOrManager() || hasRole('cashier');
+      allow read: if isStaff();
+      allow create: if isOneOfRoles(['admin', 'manager', 'cashier']);
       allow update, delete: if false;
     }
 
-    match /menu_categories/{cid} {
-      allow read: if request.auth != null;
-      allow create, update: if isAdminOrManager();
+    // --- Time Clock ---
+    match /time_clock/{tid} {
+      allow read: if isStaff();
+      allow create: if isStaff();
+      allow update: if isStaff() && (resource.data.userId == request.auth.uid || isAdminOrManager());
       allow delete: if false;
     }
-    match /menu_items/{iid} {
-      allow read: if request.auth != null;
+
+    // --- Menu Builder ---
+    match /menus/{menuId} {
+      allow read: if isStaff();
       allow create, update: if isAdminOrManager();
-      allow delete: if false;
+      allow delete: if isAdminOrManager();
     }
-    match /modifier_groups/{gid} {
-      allow read: if request.auth != null;
+    match /menu_screens/{screenId} {
+      allow read: if isStaff();
       allow create, update: if isAdminOrManager();
-      allow delete: if false;
+      allow delete: if isAdminOrManager();
     }
-    
-    match /floor_plans/{fid} {
-      allow read: if request.auth != null;
+    match /menu_buttons/{buttonId} {
+      allow read: if isStaff();
       allow create, update: if isAdminOrManager();
-      allow delete: if false;
+      allow delete: if isAdminOrManager();
     }
-    match /table_state/{tid} {
-      allow read: if request.auth != null;
-      allow create, update: if hasRole('admin') || hasRole('manager') || hasRole('cashier') || hasRole('waiter');
-      allow delete: if false;
+    match /items/{itemId} {
+      allow read: if isStaff();
+      allow create, update: if isAdminOrManager();
+      allow delete: if isAdminOrManager();
+    }
+    match /modifier_groups/{groupId} {
+      allow read: if isStaff();
+      allow create, update: if isAdminOrManager();
+      allow delete: if isAdminOrManager();
+    }
+    match /combos/{comboId} {
+      allow read: if isStaff();
+      allow create, update: if isAdminOrManager();
+      allow delete: if isAdminOrManager();
+    }
+     match /price_rules/{ruleId} {
+      allow read: if isStaff();
+      allow create, update: if isAdminOrManager();
+      allow delete: if isAdminOrManager();
+    }
+     match /menu_availability/{availId} {
+      allow read: if isStaff();
+      allow create, update: if isAdminOrManager();
+      allow delete: if isAdminOrManager();
+    }
+
+    // --- Floor Plan ---
+    match /floor_plans/{planId} {
+      allow read: if isStaff();
+      allow create, update: if isAdminOrManager();
+      allow delete: if isAdminOrManager();
+    }
+    match /table_state/{stateId} {
+      allow read: if isStaff();
+      allow create, update: if isOneOfRoles(['admin', 'manager', 'cashier', 'waiter']);
+      allow delete: if isAdminOrManager();
+    }
+
+    // --- Inventory ---
+    match /products/{productId} {
+      allow read: if isStaff();
+      allow create, update: if isAdminOrManager();
+      allow delete: if isAdmin();
+    }
+    match /inventory_ledger/{ledgerId} {
+      allow read: if isAdminOrManager();
+      allow create: if isAdminOrManager();
+      allow update, delete: if false;
     }
   }
 }

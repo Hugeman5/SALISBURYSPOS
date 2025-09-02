@@ -1,8 +1,10 @@
-
 import type { Timestamp } from 'firebase/firestore';
 
 export type Role = 'admin' | 'manager' | 'cashier' | 'waiter' | 'kitchen';
+export type LocationId = string;
+export type DeviceId = string;
 
+// POS & Day End
 export interface RegisterSession {
   id: string;
   locationId: string;
@@ -11,13 +13,13 @@ export interface RegisterSession {
   closedAt?: string; // ISO
   openingFloatCents: number;
   closingFloatCents?: number;
-  cashMovementsCents?: number; // manual cash in/out net for the session
+  cashMovementsCents?: number;
   totals?: {
-    payments: Record<string, number>; // e.g. { cash: 12345, card: 67890, yoco: 1000 }
+    payments: Record<string, number>;
     grossSalesCents: number;
-    netSalesCents: number; // after discounts/returns
+    netSalesCents: number;
     discountsCents: number;
-    returnsCents: number; // positive value represents money returned to customer
+    returnsCents: number;
     taxCents: number;
   };
   status: 'open' | 'closed';
@@ -26,24 +28,25 @@ export interface RegisterSession {
 }
 
 export interface ZClosure {
-  id: string; // z_<YYYY-MM-DD>_<locationId> (idempotent key)
-  date: string; // YYYY-MM-DD (store/local tz normalized as agreement)
+  id: string;
+  date: string;
   locationId: string;
   registerSessionIds: string[];
-  paymentTotals: Record<string, number>; // per method
+  paymentTotals: Record<string, number>;
   grossSalesCents: number;
   netSalesCents: number;
   discountsCents: number;
   returnsCents: number;
   taxCents: number;
-  cashExpectedCents: number; // opening + cash sales - payouts - refunds
-  cashCountedCents: number; // sum of session closingFloatCents
-  cashOverShortCents: number; // counted - expected
+  cashExpectedCents: number;
+  cashCountedCents: number;
+  cashOverShortCents: number;
   generatedByUserId: string;
-  generatedAt: string; // ISO
+  generatedAt: string;
   notes?: string;
 }
 
+// Time Clock
 export interface TimeClockEntry {
   id: string;
   userId: string;
@@ -51,17 +54,16 @@ export interface TimeClockEntry {
   inAt: string; // ISO
   outAt?: string; // ISO
   hourlyRateCents?: number;
-  // computed
   minutes?: number;
 }
 
+// Orders, Refunds, Payments
 export interface RefundRequestLine {
   lineId: string;
   qty: number;
   reason: 'customer_change' | 'quality' | 'wrong_item' | 'void_error' | 'other';
   note?: string;
 }
-
 
 export interface OrderItem {
   productId: string;
@@ -77,7 +79,7 @@ export interface OrderItem {
 
 export interface Payment {
   type: 'cash' | 'card';
-  amount: number; // in cents
+  amount: number;
   ref?: string;
   ts: Timestamp;
 }
@@ -114,7 +116,7 @@ export interface CartLineItem {
 export interface RefundItem {
   productId: string;
   qty: number;
-  priceInc: number; // in cents
+  priceInc: number;
   name: string;
 }
 
@@ -129,75 +131,25 @@ export interface Refund {
   method: 'cash' | 'card';
   originalOrderId: string;
   reason?: string;
-  totalRefundAmount: number; // in cents
+  totalRefundAmount: number;
 }
 
-export interface MenuCategory {
-  id: string;
-  name: string;
-  color?: string;
-  order: number;
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+// Menu Builder
+export type MenuId = string;
+export interface Menu { id: MenuId; name: string; description?: string; order: number; active: boolean; deviceIds?: DeviceId[]; default?: boolean; createdAt: string; updatedAt: string; }
+export interface MenuScreen { id: string; menuId: MenuId; name: string; color?: string; order: number; parentScreenId?: string | null; }
+export interface MenuButton { id: string; menuId: MenuId; screenId: string; type: 'item'|'combo'|'discount'|'instruction'|'order_profile'|'submenu'; refId?: string; label?: string; color?: string; order: number; }
+export interface Item { id: string; name: string; sku?: string; plu?: string; categoryId?: string; priceCents: number; taxRate?: number; imageUrl?: string; active: boolean; printerRouteIds?: string[]; tags?: string[]; modifierGroupIds?: string[]; createdAt: string; updatedAt: string; }
+export interface ModifierGroup { id: string; name: string; min: number; max: number; items: { id: string; name: string; priceDeltaCents: number; active: boolean }[]; active: boolean; }
+export interface Combo { id: string; name: string; priceCents: number; groups: { name: string; required: boolean; min: number; max: number; options: { itemId: string }[] }[]; active: boolean; }
+export interface PriceRule { id: string; name: string; type: 'percent_discount'|'percent_surcharge'|'absolute_adjust'; value: number; appliesTo: { itemIds?: string[]; categoryIds?: string[] };
+  schedule?: { days?: number[]; from?: string; to?: string }; locationIds?: string[]; orderProfileIds?: string[]; active: boolean; }
+export interface MenuAvailability { id: string; menuId: MenuId; schedule: { days?: number[]; from?: string; to?: string; dates?: string[] }; devices?: DeviceId[]; locations?: LocationId[]; }
 
-export interface ModifierItem { id: string; name: string; priceDeltaCents: number; active: boolean }
-export interface ModifierGroup {
-  id: string;
-  name: string;
-  min: number; // min selections
-  max: number; // max selections (0 = unlimited)
-  items: ModifierItem[];
-  active: boolean;
-}
-
-export interface MenuItem {
-  id: string;
-  name: string;
-  sku?: string; // internal SKU
-  plu?: string; // keypad code
-  categoryId: string;
-  priceCents: number;
-  taxRate?: number; // percent, e.g. 15 for 15%
-  active: boolean;
-  imageUrl?: string;
-  tags?: string[];
-  modifierGroupIds?: string[];
-  availability?: { days?: number[]; from?: string; to?: string }; // 0-6 (Sun-Sat), HH:mm local
-  createdAt: string;
-  updatedAt: string;
-}
-
+// Floor Plan
+export interface FloorPlan { id: string; locationId: LocationId; name: string; width: number; height: number; imageUrl?: string; orderProfileId?: string; promptCovers?: boolean; receiptPrinterProfileId?: string; draftPrinterProfileId?: string; tables: FloorTable[]; updatedAt: string; }
 export type TableShape = 'rect'|'round';
-
-export interface FloorPlanTable {
-  id: string;
-  name: string; // e.g., T1
-  shape: TableShape;
-  x: number; y: number; // px in builder canvas
-  w: number; h: number; // px
-  seats: number;
-  zone?: string; // e.g., Patio, Inside
-  active: boolean;
-}
-
-export interface FloorPlan {
-  id: string;
-  locationId: string;
-  name: string;
-  width: number; height: number; // canvas size
-  tables: FloorPlanTable[];
-  updatedAt: string;
-}
-
-export interface TableState {
-  id: string;          // table id
-  locationId: string;
-  status: 'open'|'occupied'|'dirty'|'reserved'|'merged';
-  serverUserId?: string;
-  covers?: number;
-  orderId?: string;    // current dine-in order
-  mergedIntoId?: string; // if merged
-  updatedAt: string;
-}
+export interface FloorTable { id: string; name: string; refNumber?: string;
+  shape: TableShape; x: number; y: number; w: number; h: number; rotation?: number; seats: number; zone?: string; visible: boolean; }
+export interface TableState { id: string; locationId: LocationId; tableId: string; status: 'open'|'occupied'|'dirty'|'reserved'|'merged'|'disabled'; serverUserId?: string; covers?: number; orderId?: string; since?: string;
+  mergedIntoId?: string; updatedAt: string; }
