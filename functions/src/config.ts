@@ -1,2 +1,5 @@
-export const CASH_PAYOUT_APPROVAL_CENTS = Number(process.env.CASH_PAYOUT_APPROVAL_CENTS || 100000); // R1,000
-export const DISCOUNT_APPROVAL_PERCENT = Number(process.env.DISCOUNT_APPROVAL_PERCENT || 15); // 15%
+
+export const CASH_PAYOUT_APPROVAL_CENTS =
+  Number(process.env.CASH_PAYOUT_APPROVAL_CENTS || 100000); // R1,000
+export const DISCOUNT_APPROVAL_PERCENT =
+  Number(process.env.DISCOUNT_APPROVAL_PERCENT || 15); // 15%

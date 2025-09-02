@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview User and authentication management functions.
  */
@@ -38,7 +39,7 @@ export const adminUpsertUser = onCall({cors: true}, async (req) => {
 
   // Additional Validation
   if (isNew && !/^[a-z0-9-]{3,24}$/.test(data.id)) {
-    const msg = "On create, ID must be 3-24 lowercase letters/numbers/hyphens.";
+    const msg = "On create, ID must be 3-24 letters/numbers/hyphens.";
     throw new HttpsError("invalid-argument", msg);
   }
 
@@ -116,7 +117,8 @@ export const adminSetUserPin = onCall({cors: true}, async (req) => {
         displayName: userData?.name || id,
       });
     } else {
-      throw new HttpsError("internal", firebaseError.message || "Unknown auth error");
+      throw new HttpsError("internal",
+        firebaseError.message || "Unknown auth error");
     }
   }
 

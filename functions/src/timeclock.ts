@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview Cloud Functions for employee time clock management.
  */
@@ -124,7 +125,7 @@ export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
   const byUser: Record<string, { totalSecs: number; totalCost: number; }> = {};
 
   snap.forEach((doc) => {
-    const s = doc.data();
+    const s = doc.data() as any;
     const inMs = (s.inAt as Timestamp).toMillis();
     const outMs = s.outAt ? (s.outAt as Timestamp).toMillis() : null;
     const dur = s.durationSec ?? (outMs ?

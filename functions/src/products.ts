@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview Cloud Functions for product and category management.
  */

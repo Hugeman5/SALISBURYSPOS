@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview Cloud Functions for generating daily sales reports (Z-Reports).
  */
@@ -9,7 +10,7 @@ import {db, requireRole} from "./utils";
 
 /**
  * Creates a time window for a given date in the Africa/Johannesburg timezone.
- * @param {string} [dateStr] - The date in 'YYYY-MM-DD' format. Defaults to today.
+ * @param {string} [dateStr] - The date in 'YYYY-MM-DD' format.
  * @return {{startMs: number, endMs: number, key: string}} The time window.
  */
 function saDayWindow(dateStr?: string) {
@@ -29,7 +30,9 @@ function saDayWindow(dateStr?: string) {
     const parts = f.formatToParts(new Date());
     const p = (t: string) => Number(parts.find((pt) => pt.type === t)?.value);
     y = p("year"); m = p("month"); d = p("day");
-    dateStr = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const mStr = String(m).padStart(2, "0");
+    const dStr = String(d).padStart(2, "0");
+    dateStr = `${y}-${mStr}-${dStr}`;
   }
 
   const SA_OFFSET_MS = 2 * 60 * 60 * 1000;
@@ -64,7 +67,7 @@ export const adminCloseDay = onCall({cors: true}, async (req) => {
   };
 
   snap.forEach((doc) => {
-    const d = doc.data();
+    const d = doc.data() as any;
     if (d.status !== "paid") return;
     const gross = Number(d.totals?.totalInc || 0);
     totals.countPaid++;
