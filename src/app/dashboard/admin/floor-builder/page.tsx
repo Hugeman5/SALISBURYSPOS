@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import FloorCanvas from '../../../../components/FloorCanvas';
+import FloorCanvas from '@/components/FloorCanvas';
 import UploadDropzone from '@/components/UploadDropzone';
 import { app } from '@/lib/firebaseClient';
 import { getFunctions, httpsCallable } from 'firebase/functions';
