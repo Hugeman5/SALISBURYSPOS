@@ -1,16 +1,30 @@
 
-import * as admin from "firebase-admin";
+import * as admin from 'firebase-admin';
 if (!admin.apps.length) admin.initializeApp();
 
-export {adminCloseDay} from "./adminCloseDay";
-export {adminExportTimeCsv} from "./adminExportTimeCsv";
-export {adminExportZCsv} from "./reports";
-export {cashierRefundItems} from "./cashierRefundItems";
-export {postCashMovement, manageRegisterSession} from "./cash-register";
-export {adminUpsertMenu} from "./adminUpsertMenu";
-export {adminExportMenuCsv} from "./adminExportMenuCsv";
-export {adminUpsertFloorPlan} from "./adminUpsertFloorPlan";
-export {openTableTab} from "./openTableTab";
-export {moveTabToTable} from "./moveTabToTable";
-export {mergeTables} from "./mergeTables";
-export {closeTableTab} from "./closeTableTab";
+// Menu Management
+export { adminUpsertMenuEntities } from './menu/adminUpsertMenuEntities';
+export { adminImportMenuCsv } from './menu/adminImportMenuCsv';
+export { adminExportMenuCsv } from './menu/adminExportMenuCsv';
+export { adminUpsertPriceRules } from './menu/adminUpsertPriceRules';
+export { adminSetMenuAvailability } from './menu/adminSetMenuAvailability';
+
+// Storage
+export { getSignedUploadUrl } from './storage/getSignedUploadUrl';
+
+// Floor Plan Management
+export { adminUpsertFloorPlan } from './floor/adminUpsertFloorPlan';
+export { adminDisableTables } from './floor/adminDisableTables';
+export { openTableTab } from './floor/openTableTab';
+export { moveTabToTable } from './floor/moveTabToTable';
+export { mergeTables } from './floor/mergeTables';
+export { closeTableTab } from './floor/closeTableTab';
+
+// Order & Check Management
+export { splitCheck } from './orders/splitCheck';
+export { mergeChecks } from './orders/mergeChecks';
+export { transferItems } from './orders/transferItems';
+export { printChecks } from './orders/printChecks';
+
+// Note: Legacy functions from the old structure are not exported here.
+// This file should only contain exports from the new modular source files.
