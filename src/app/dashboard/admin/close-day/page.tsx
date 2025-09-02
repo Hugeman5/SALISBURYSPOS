@@ -1,13 +1,12 @@
 
 'use client';
 import { useState } from 'react';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { call } from '@/lib/functions/call';
 
 export default function CloseDayPage(){
   const { toast } = useToast();
@@ -15,15 +14,14 @@ export default function CloseDayPage(){
   const [date, setDate] = useState(new Date().toISOString().slice(0,10));
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
-  const fn = httpsCallable(getFunctions(app), 'adminCloseDay');
 
   async function run(){
     setLoading(true);
     setResult(null);
     try {
-      const r: any = await fn({ locationId, date });
+      const r: any = await call('adminCloseDay', { locationId, date });
       setResult(r.data);
-      toast({ title: "Z-Closure Generated", description: `Report ID: ${r.data.id}` });
+      toast({ title: "Z-Closure Generated", description: `Report ID: ${r.id}` });
     } catch (e:any) {
       toast({ variant: 'destructive', title: 'Operation Failed', description: e.message || 'An unknown error occurred' });
     } finally { setLoading(false); }
