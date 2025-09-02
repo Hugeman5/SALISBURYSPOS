@@ -8,6 +8,14 @@ interface Payload {
   end: string;
 }
 
+interface TimeClockEntry {
+  userId: string;
+  locationId?: string;
+  inAt: string;
+  outAt?: string;
+  hourlyRateCents?: number;
+}
+
 export const adminExportTimeCsv = onCall<Payload>(async (req) => {
   const ctx = req.auth;
   if (!ctx) throw new Error("UNAUTH");
@@ -27,10 +35,10 @@ export const adminExportTimeCsv = onCall<Payload>(async (req) => {
   }
   const snap = await q.get();
 
-  const rows: any[] = [];
+  const rows: object[] = [];
   const byUser: Record<string, number> = {};
   for (const doc of snap.docs) {
-    const t: any = doc.data();
+    const t = doc.data() as TimeClockEntry;
     const outAt = t.outAt || t.inAt;
     const timeDiff = new Date(outAt).getTime() - new Date(t.inAt).getTime();
     const minutes = Math.max(0, Math.round(timeDiff / 60000));
@@ -52,7 +60,7 @@ export const adminExportTimeCsv = onCall<Payload>(async (req) => {
   const header = ["userId", "locationId", "inAt", "outAt", "minutes",
     "hours", "hourlyRate", "pay"];
   const csv = [header.join(",")]
-    .concat(rows.map((r) => header.map((h) =>
+    .concat(rows.map((r: any) => header.map((h) =>
       String(r[h]).replace(/,/g, " ")).join(",")))
     .join("\n");
   const totals = Object.entries(byUser)

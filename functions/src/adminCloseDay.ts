@@ -9,13 +9,28 @@ interface CloseDayPayload {
   notes?: string;
 }
 
+interface RegisterSession {
+  status: string;
+  totals?: {
+    payments: Record<string, number>;
+    grossSalesCents?: number;
+    netSalesCents?: number;
+    discountsCents?: number;
+    returnsCents?: number;
+    taxCents?: number;
+  };
+  openingFloatCents?: number;
+  closingFloatCents?: number;
+  cashMovementsCents?: number;
+}
+
 export const adminCloseDay = onCall<CloseDayPayload>(async (req) => {
   const ctx = req.auth;
   if (!ctx) {
     throw new Error("UNAUTH");
   }
-  const role = (ctx.token as any)?.role;
-  if (!["admin", "manager"].includes(role)) {
+  const role = (ctx.token as {role?: string})?.role;
+  if (!["admin", "manager"].includes(role ?? "")) {
     throw new Error("FORBIDDEN");
   }
   const {locationId, date, notes} = req.data;
@@ -42,10 +57,10 @@ export const adminCloseDay = onCall<CloseDayPayload>(async (req) => {
   let tax = 0; let cashExpected = 0; let cashCounted = 0;
   let cashMovementTotal = 0;
   const sessionIds: string[] = [];
-  const sessionRows: any[] = [];
+  const sessionRows: object[] = [];
 
   for (const doc of sessionsSnap.docs) {
-    const s = doc.data() as any;
+    const s = doc.data() as RegisterSession;
     sessionIds.push(doc.id);
     if (s.status !== "closed") {
       throw new Error(`SESSION_OPEN:${doc.id}`);

@@ -2,6 +2,18 @@
 import {onCall} from "firebase-functions/v2/https";
 import {getFirestore} from "firebase-admin/firestore";
 
+interface Category {
+  name: string;
+}
+
+interface MenuItem {
+  name: string;
+  categoryId: string;
+  sku?: string;
+  plu?: string;
+  priceCents: number;
+  active: boolean;
+}
 
 export const adminExportMenuCsv = onCall(async (req)=>{
   const ctx = req.auth;
@@ -17,12 +29,12 @@ export const adminExportMenuCsv = onCall(async (req)=>{
 
   const byCat: Record<string, string> = {};
   cats.docs.forEach((d)=> {
-    byCat[d.id] = (d.data() as {name: string}).name;
+    byCat[d.id] = (d.data() as Category).name;
   });
 
   const header = ["category", "item", "sku", "plu", "price", "active"];
   const rows = items.docs.map((d)=>{
-    const x = d.data() as any;
+    const x = d.data() as MenuItem;
     const price = (x.priceCents/100).toFixed(2);
     const active = x.active ? "1" : "0";
     return [

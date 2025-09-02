@@ -194,7 +194,7 @@ export const cashierCloseOrder = onCall({cors: true}, async (req) => {
       });
     }
 
-    const orderUpdate: {[key: string]: any} = {
+    const orderUpdate: {[key: string]: unknown} = {
       status: "paid",
       closedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),

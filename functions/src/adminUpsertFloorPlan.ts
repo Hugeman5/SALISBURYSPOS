@@ -8,7 +8,7 @@ interface Payload {
   name: string;
   width?: number;
   height?: number;
-  tables: any[];
+  tables: object[];
 }
 
 export const adminUpsertFloorPlan = onCall<Payload>(async (req)=>{

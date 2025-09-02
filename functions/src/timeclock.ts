@@ -106,7 +106,7 @@ export const clockOut = onCall({cors: true}, async (req) => {
  */
 export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
   requireRole(req, ["admin", "manager"]);
-  const {startMs, endMs} = req.data;
+  const {startMs, endMs} = req.data as {startMs: number, endMs: number};
   if (!startMs || !endMs || endMs <= startMs) {
     const msg = "Valid startMs and endMs are required.";
     throw new HttpsError("invalid-argument", msg);

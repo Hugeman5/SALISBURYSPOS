@@ -14,6 +14,19 @@ interface Payload {
   method: "cash" | "card" | "store_credit";
 }
 
+interface OrderLine {
+  lineId: string;
+  qty?: number;
+  unitPriceCents?: number;
+}
+
+interface Order {
+  lines?: OrderLine[];
+  customerId?: string;
+  totalPaidCents?: number;
+  refundsCents?: number;
+}
+
 export const cashierRefundItems = onCall<Payload>(async (req) => {
   const ctx = req.auth;
   if (!ctx) throw new Error("UNAUTH");
@@ -34,8 +47,8 @@ export const cashierRefundItems = onCall<Payload>(async (req) => {
   await db.runTransaction(async (tx) => {
     const orderSnap = await tx.get(orderRef);
     if (!orderSnap.exists) throw new Error("ORDER_NOT_FOUND");
-    const order: any = orderSnap.data();
-    const byId: Record<string, any> = {};
+    const order = orderSnap.data() as Order;
+    const byId: Record<string, OrderLine> = {};
     for (const l of (order.lines || [])) byId[l.lineId] = l;
     let refundCents = 0;
     for (const rl of lines) {

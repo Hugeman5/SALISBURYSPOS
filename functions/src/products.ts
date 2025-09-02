@@ -31,7 +31,7 @@ function toExCents(incCents: number, taxRate: number): number {
 }
 
 /**
- * Finds a category by its lowercase name or creates it if it doesn't exist.
+ * Finds a category by name or creates it if it doesn't exist.
  * @param {string | null | undefined} name The category name.
  * @return {Promise<{id: string | null, name: string | null}>} The category.
  */
