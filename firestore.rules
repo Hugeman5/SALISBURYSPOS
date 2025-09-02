@@ -1,92 +1,86 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId} {
-      allow read: if true;
-      allow write: if request.auth.token.role in ['admin', 'manager'];
+    
+    // Helper function to check for admin/manager roles from the auth token custom claims
+    function isManager() {
+      return request.auth.token.role in ['admin', 'manager'];
     }
-    match /user_secrets/{userId} {
-      allow read: if true;
-      allow write: if request.auth.token.role in ['admin', 'manager'];
-    }
-    match /products/{productId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.token.role in ['admin', 'manager'];
-    }
-    match /categories/{categoryId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.token.role in ['admin', 'manager'];
-    }
-    match /orders/{orderId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth.token.role in ['admin', 'manager', 'cashier'];
-    }
-    match /orders/{orderId}/refunds/{refundId} {
-      allow read: if request.auth.token.role in ['admin', 'manager', 'cashier'];
-      allow create: if request.auth.token.role in ['admin', 'manager', 'cashier'];
-    }
-    match /inventory_ledger/{ledgerId} {
-      allow read: if request.auth.token.role in ['admin', 'manager'];
-      allow create: if request.auth.token.role in ['admin', 'manager'];
-    }
-    match /register_sessions/{sessionId} {
-      allow read: if request.auth.token.role in ['admin', 'manager', 'cashier'];
-      allow write: if request.auth.token.role in ['admin', 'manager'];
-    }
-     match /register_sessions/{sessionId}/cash_movements/{movementId} {
-      allow read: if request.auth.token.role in ['admin', 'manager', 'cashier'];
-      allow create: if request.auth.token.role in ['admin', 'manager'];
-    }
-    match /z_closures/{closureId} {
-        allow read: if request.auth.token.role in ['admin', 'manager'];
-        allow write: if request.auth.token.role in ['admin', 'manager'];
-    }
-     match /time_clock/{punchId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
-      allow update: if request.auth != null && resource.data.uid == request.auth.uid;
+    
+    // Helper function to check for staff roles
+    function isStaff() {
+      return request.auth.token.role in ['admin', 'manager', 'cashier', 'waiter'];
     }
 
-    // New rules for Menu Builder and Floor Plan
-    match /menus/{menuId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.token.role in ['admin', 'manager'];
+    // Public user profiles - readable by anyone for login screen, writable by owner or manager+
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if isManager() || request.auth.uid == userId;
     }
-    match /menu_screens/{screenId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.token.role in ['admin', 'manager'];
+    
+    // User secrets (like PIN hashes) should not be readable by the client
+    match /user_secrets/{secretId} {
+      allow read, write: if false; // Only accessible via Admin SDK in functions
     }
-    match /menu_buttons/{buttonId} {
+
+    // Menu-related collections
+    match /menus/{docId} {
       allow read: if request.auth != null;
-      allow write: if request.auth.token.role in ['admin', 'manager'];
+      allow write: if isManager();
     }
-    match /items/{itemId} {
+    match /menu_screens/{docId} {
       allow read: if request.auth != null;
-      allow write: if request.auth.token.role in ['admin', 'manager'];
+      allow write: if isManager();
     }
-    match /modifier_groups/{groupId} {
+    match /menu_buttons/{docId} {
       allow read: if request.auth != null;
-      allow write: if request.auth.token.role in ['admin', 'manager'];
+      allow write: if isManager();
     }
-    match /combos/{comboId} {
+    match /items/{docId} {
       allow read: if request.auth != null;
-      allow write: if request.auth.token.role in ['admin', 'manager'];
+      allow write: if isManager();
     }
-    match /price_rules/{ruleId} {
+    match /modifier_groups/{docId} {
       allow read: if request.auth != null;
-      allow write: if request.auth.token.role in ['admin', 'manager'];
+      allow write: if isManager();
     }
-    match /menu_availability/{availabilityId} {
+     match /combos/{docId} {
       allow read: if request.auth != null;
-      allow write: if request.auth.token.role in ['admin', 'manager'];
+      allow write: if isManager();
     }
-    match /floor_plans/{planId} {
+     match /price_rules/{docId} {
       allow read: if request.auth != null;
-      allow write: if request.auth.token.role in ['admin', 'manager'];
+      allow write: if isManager();
     }
-    match /table_state/{stateId} {
+    match /menu_availability/{docId} {
       allow read: if request.auth != null;
-      allow write: if request.auth.token.role in ['admin', 'manager', 'cashier', 'waiter'];
+      allow write: if isManager();
+    }
+    match /categories/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isManager();
+    }
+    match /products/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isManager();
+    }
+
+    // Floor plan configuration
+    match /floor_plans/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isManager();
+    }
+    
+    // Live table state, writable by more roles
+    match /table_state/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isStaff();
+    }
+
+    // All other collections require at least an authenticated user for any access
+    match /{document=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }

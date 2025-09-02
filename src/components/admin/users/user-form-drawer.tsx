@@ -5,8 +5,7 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { User, Role } from '@/types';
-import { ROLES } from '@/types';
+import type { User } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -37,6 +36,9 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { upsertUser } from '@/lib/functions/users';
 import { useToast } from '@/hooks/use-toast';
+
+export const ROLES = ['admin','manager','cashier','waiter','kitchen'] as const;
+export type Role = typeof ROLES[number];
 
 const userFormSchema = z.object({
   id: z.string().min(1, 'ID is required.'),
@@ -84,7 +86,7 @@ export function UserFormDrawer({ isOpen, onClose, onSaveSuccess, user, currentUs
           form.reset({
             id: user.id,
             name: user.name,
-            role: user.role,
+            role: user.role as Role,
             active: user.active,
             hourlyRateZar: user.hourlyRateCents ? (user.hourlyRateCents / 100).toFixed(2) : '0',
           });
@@ -105,7 +107,7 @@ export function UserFormDrawer({ isOpen, onClose, onSaveSuccess, user, currentUs
         await upsertUser({
             id: data.id,
             name: data.name,
-            role: data.role,
+            role: data.role as Role,
             active: data.active,
             hourlyRateZar: Number(data.hourlyRateZar) || 0,
         });

@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2021",
-    "lib": ["dom", "dom.iterable", "es2021"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "es2021"
+    ],
     "allowJs": false,
     "skipLibCheck": true,
     "strict": true,
@@ -20,14 +24,17 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": [
+        "src/*"
+      ]
     }
   },
   "include": [
     "next-env.d.ts",
     "src/app/**/*",
     "src/components/**/*",
-    "src/lib/**/*"
+    "src/lib/**/*",
+    ".next/types/**/*.ts"
   ],
   "exclude": [
     "functions",
