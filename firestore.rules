@@ -1,206 +1,92 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    /* =========
-       Helpers
-       ========= */
-    function authed() {
-      return request.auth != null;
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if request.auth.token.role in ['admin', 'manager'];
+    }
+    match /user_secrets/{userId} {
+      allow read: if true;
+      allow write: if request.auth.token.role in ['admin', 'manager'];
+    }
+    match /products/{productId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.token.role in ['admin', 'manager'];
+    }
+    match /categories/{categoryId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.token.role in ['admin', 'manager'];
+    }
+    match /orders/{orderId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth.token.role in ['admin', 'manager', 'cashier'];
+    }
+    match /orders/{orderId}/refunds/{refundId} {
+      allow read: if request.auth.token.role in ['admin', 'manager', 'cashier'];
+      allow create: if request.auth.token.role in ['admin', 'manager', 'cashier'];
+    }
+    match /inventory_ledger/{ledgerId} {
+      allow read: if request.auth.token.role in ['admin', 'manager'];
+      allow create: if request.auth.token.role in ['admin', 'manager'];
+    }
+    match /register_sessions/{sessionId} {
+      allow read: if request.auth.token.role in ['admin', 'manager', 'cashier'];
+      allow write: if request.auth.token.role in ['admin', 'manager'];
+    }
+     match /register_sessions/{sessionId}/cash_movements/{movementId} {
+      allow read: if request.auth.token.role in ['admin', 'manager', 'cashier'];
+      allow create: if request.auth.token.role in ['admin', 'manager'];
+    }
+    match /z_closures/{closureId} {
+        allow read: if request.auth.token.role in ['admin', 'manager'];
+        allow write: if request.auth.token.role in ['admin', 'manager'];
+    }
+     match /time_clock/{punchId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
-    function role() {
-      return authed() ? (request.auth.token.role) : null;
+    // New rules for Menu Builder and Floor Plan
+    match /menus/{menuId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.token.role in ['admin', 'manager'];
     }
-
-    function isAdmin()   { return role() == 'admin'; }
-    function isManager() { return role() == 'manager'; }
-    function isCashier() { return role() == 'cashier'; }
-    function isWaiter()  { return role() == 'waiter'; }
-    function isKitchen() { return role() == 'kitchen'; }
-
-    // Broad staff group (front of house may update table/order state)
-    function isStaff() {
-      return isAdmin() || isManager() || isCashier() || isWaiter();
+    match /menu_screens/{screenId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.token.role in ['admin', 'manager'];
     }
-
-    // Timestamp sanity: require createdAt on create; keep createdAt immutable; updatedAt fresh & monotonic.
-    function hasCreateTimestamps() {
-      return request.resource.data.keys().hasAll(['createdAt','updatedAt']) &&
-             request.resource.data.createdAt is timestamp &&
-             request.resource.data.updatedAt is timestamp &&
-             abs(request.time.toMillis() - request.resource.data.createdAt.toMillis()) < 5 * 60 * 1000 &&
-             abs(request.time.toMillis() - request.resource.data.updatedAt.toMillis()) < 5 * 60 * 1000;
+    match /menu_buttons/{buttonId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.token.role in ['admin', 'manager'];
     }
-
-    function hasUpdateTimestamps() {
-      return resource.data.createdAt == request.resource.data.createdAt &&
-             request.resource.data.updatedAt is timestamp &&
-             request.resource.data.updatedAt.toMillis() >= resource.data.updatedAt.toMillis() &&
-             abs(request.time.toMillis() - request.resource.data.updatedAt.toMillis()) < 5 * 60 * 1000;
+    match /items/{itemId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.token.role in ['admin', 'manager'];
     }
-
-    // Convenience to permit creates/updates with timestamp checks.
-    function allowWriteWithTimestamps() {
-      return
-        // create (resource does not exist)
-        (!exists(resource.__name__) && hasCreateTimestamps()) ||
-        // update
-        (exists(resource.__name__)  && hasUpdateTimestamps());
+    match /modifier_groups/{groupId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.token.role in ['admin', 'manager'];
     }
-
-    // Allowed table states
-    function validTableStatus(s) {
-      return s in ['open','occupied','dirty','reserved','merged','disabled'];
+    match /combos/{comboId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.token.role in ['admin', 'manager'];
     }
-
-    /* =========
-       Settings (optional shared config doc)
-       ========= */
-    match /settings/{id} {
-      allow read:  if authed();
-      allow write: if isAdmin() || isManager();
+    match /price_rules/{ruleId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.token.role in ['admin', 'manager'];
     }
-
-    /* =========
-       Menu Builder data
-       ========= */
-    match /menus/{id} {
-      allow read:  if authed();
-      allow write: if (isAdmin() || isManager()) && allowWriteWithTimestamps();
+    match /menu_availability/{availabilityId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.token.role in ['admin', 'manager'];
     }
-
-    match /menu_screens/{id} {
-      allow read:  if authed();
-      allow write: if (isAdmin() || isManager()) && allowWriteWithTimestamps();
+    match /floor_plans/{planId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.token.role in ['admin', 'manager'];
     }
-
-    match /menu_buttons/{id} {
-      allow read:  if authed();
-      allow write: if (isAdmin() || isManager()) && allowWriteWithTimestamps();
-    }
-
-    match /items/{id} {
-      allow read:  if authed();
-      allow write: if (isAdmin() || isManager()) && allowWriteWithTimestamps();
-    }
-
-    match /modifier_groups/{id} {
-      allow read:  if authed();
-      allow write: if (isAdmin() || isManager()) && allowWriteWithTimestamps();
-    }
-
-    match /combos/{id} {
-      allow read:  if authed();
-      allow write: if (isAdmin() || isManager()) && allowWriteWithTimestamps();
-    }
-
-    match /price_rules/{id} {
-      allow read:  if authed();
-      allow write: if (isAdmin() || isManager()) && allowWriteWithTimestamps();
-    }
-
-    match /menu_availability/{id} {
-      allow read:  if authed();
-      allow write: if (isAdmin() || isManager()) && allowWriteWithTimestamps();
-    }
-
-    /* =========
-       Floor Plans & live table state
-       ========= */
-    match /floor_plans/{id} {
-      allow read:  if authed();
-      allow write: if (isAdmin() || isManager()) && allowWriteWithTimestamps();
-    }
-
-    // Live status per table (FOH can write)
-    match /table_state/{id} {
-      allow read:  if authed();
-
-      // Staff may create an entry for a table with sane fields
-      allow create: if isStaff() &&
-        request.resource.data.keys().hasAll(['id','tableId','locationId','status','updatedAt']) &&
-        validTableStatus(request.resource.data.status) &&
-        hasCreateTimestamps();
-
-      // Staff may update limited fields on table state
-      allow update: if isStaff() &&
-        // immutable identifiers
-        request.resource.data.id == resource.data.id &&
-        request.resource.data.tableId == resource.data.tableId &&
-        request.resource.data.locationId == resource.data.locationId &&
-        // status must be valid; mergedIntoId can be toggled by merge workflow
-        validTableStatus(request.resource.data.status) &&
-        // timestamp discipline
-        hasUpdateTimestamps();
-
-      // No deletes from clients
-      allow delete: if false;
-    }
-
-    /* =========
-       Orders & printing (basic guards; server functions do heavy lifting)
-       ========= */
-    match /orders/{id} {
-      allow read:  if authed();
-
-      // Staff can create orders (e.g., openTableTab)
-      allow create: if isStaff() && hasCreateTimestamps();
-
-      // Staff can update active orders (status transitions are left to Functions to enforce)
-      allow update: if isStaff() && hasUpdateTimestamps();
-
-      allow delete: if false;
-    }
-
-    match /print_jobs/{id} {
-      allow read:  if authed();
-      // Staff can enqueue print jobs; status updates generally happen server-side
-      allow create: if isStaff() && hasCreateTimestamps();
-      allow update: if (isAdmin() || isManager()) && hasUpdateTimestamps();
-      allow delete: if false;
-    }
-
-    /* =========
-       Cash-up & store credit (light guardrails; approvals by manager/admin)
-       ========= */
-    match /cash_movements/{id} {
-      allow read:  if authed();
-
-      // Cashiers/Waiters can log PENDING movements; only manager/admin can approve or modify non-pending.
-      allow create: if isStaff() &&
-        request.resource.data.status == 'pending' &&
-        hasCreateTimestamps();
-
-      allow update: if
-        // Managers/Admins can update anything (approve/void/etc.)
-        ((isAdmin() || isManager()) && hasUpdateTimestamps()) ||
-        // Staff can update their own pending record (e.g., fix note/amount) while status stays pending
-        (isStaff() &&
-         resource.data.status == 'pending' &&
-         request.resource.data.status == 'pending' &&
-         hasUpdateTimestamps());
-
-      allow delete: if false;
-    }
-
-    match /z_closures/{id} {
-      allow read:  if authed();
-      // Close Day is a manager/admin action
-      allow write: if (isAdmin() || isManager()) && allowWriteWithTimestamps();
-    }
-
-    match /credit_notes/{id} {
-      allow read:  if authed();
-      // Safer to restrict to manager/admin; issuance via Cloud Function also bypasses rules
-      allow write: if (isAdmin() || isManager()) && allowWriteWithTimestamps();
-    }
-
-    match /store_credit_ledger/{id} {
-      allow read:  if authed();
-      // Ledger writes should be system-driven; allow manager/admin for manual adjustments
-      allow write: if (isAdmin() || isManager()) && allowWriteWithTimestamps();
+    match /table_state/{stateId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.token.role in ['admin', 'manager', 'cashier', 'waiter'];
     }
   }
 }
