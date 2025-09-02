@@ -26,6 +26,13 @@ export const adminUpsertMenuEntities = onCall(async (req) => {
   };
 
   switch (entity) {
+    case 'category':
+        return upsert('menu_categories', {
+            name: data.name,
+            color: data.color || null,
+            order: data.order ?? 0,
+            active: data.active ?? true,
+        });
     case 'item':
       return upsert('items', {
         name: data.name,
@@ -53,7 +60,6 @@ export const adminUpsertMenuEntities = onCall(async (req) => {
         items: items,
         active: data.active ?? true,
       });
-    // Add other cases for Menu, MenuScreen, MenuButton, Combo as needed
     default:
       throw new Error('BAD_ENTITY');
   }
