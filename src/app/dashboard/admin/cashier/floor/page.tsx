@@ -1,6 +1,7 @@
+
 'use client';
 import { useEffect, useState } from 'react';
-import { app } from '@/lib/firebaseClient';
+import { app } from '@/lib/firebase';
 import { getFirestore, collection, onSnapshot, query, where } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
@@ -21,7 +22,7 @@ export default function FloorLive(){
       const map:any={}; s.docs.forEach(d=> map[d.id]=d.data()); setState(map);
     });
     return ()=>{unsubPlan();unsubState();};
-  },[locationId]);
+  },[locationId, db]);
 
   const colorFor = (st:string)=> st==='occupied'? '#fde68a' : st==='dirty'? '#fecaca' : st==='reserved'? '#c7d2fe' : st==='disabled'? '#e5e7eb' : '#dcfce7';
   const sinceText = (iso?:string)=>{ if(!iso) return ''; const mins = Math.max(0, Math.floor((Date.now()-new Date(iso).getTime())/60000)); const h=Math.floor(mins/60), m=mins%60; return h? `${h}h ${m}m` : `${m}m`; };
