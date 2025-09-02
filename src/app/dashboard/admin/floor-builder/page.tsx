@@ -1,8 +1,9 @@
+
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import FloorCanvas from '@/components/FloorCanvas';
 import UploadDropzone from '@/components/UploadDropzone';
-import { app } from '@/lib/firebaseClient';
+import { app } from '@/lib/firebase';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getFirestore, collection, onSnapshot, query, where } from 'firebase/firestore';
 
@@ -24,7 +25,13 @@ export default function FloorBuilderPage(){
 
   // Load first plan for location in real-time
   useEffect(()=>{
-    const unsub = onSnapshot(query(collection(db,'floor_plans'), where('locationId','==', locationId)), s => {
+    const q = query(collection(db,'floor_plans'), where('locationId','==', locationId));
+    const unsub = onSnapshot(q, (s) => {
+      if (s.empty) {
+        console.log("No floor plan found for this location yet.");
+        // Keep default plan state if none exists
+        return;
+      }
       const doc0 = s.docs[0];
       if (!doc0) return;
       const p:any = doc0.data();
@@ -39,7 +46,7 @@ export default function FloorBuilderPage(){
 
   function addTable(){
     const id = `T${(nodes.length+1).toString().padStart(2,'0')}`;
-    setNodes(ns=> ns.concat({ id, name:id, x:40, y:40, w:100, h:80, rotation:0, shape:'rect', seats:4, visible:true }));
+    setNodes(ns=> ns.concat({ id, name:id, x:40, y:40, w:100, h:80, rotation:0, shape:'rect', seats:4, visible:true, zone: '' }));
   }
   function duplicate(){
     if(!selectedId) return; const src=nodes.find(n=>n.id===selectedId)!;
