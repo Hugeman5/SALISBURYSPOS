@@ -1,3 +1,14 @@
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  /* fallback if Tailwind classes don't load */
+  background: #fafafa;
+  color: #0f172a;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
