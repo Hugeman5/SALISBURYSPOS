@@ -28,6 +28,7 @@ interface CheckoutModalProps {
 }
 
 type PaymentType = Payment['type'];
+type CreateOrderResult = { orderId: string };
 
 export function CheckoutModal({ isOpen, onClose, cashierId, cashierName }: CheckoutModalProps) {
   const { toast } = useToast();
@@ -68,7 +69,7 @@ export function CheckoutModal({ isOpen, onClose, cashierId, cashierName }: Check
     setProcessing(true);
     
     try {
-      const { orderId: newOrderId } = await call('cashierCreateOrder', { note: '' });
+      const { orderId: newOrderId } = await call<CreateOrderResult>('cashierCreateOrder', { note: '' });
       if (!newOrderId) throw new Error("Failed to create order.");
 
       await call('cashierSetItems', { 

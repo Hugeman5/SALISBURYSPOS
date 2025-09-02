@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import type { User, Role } from '@/types';
+import { ROLES } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -37,12 +38,10 @@ import { Loader2 } from 'lucide-react';
 import { upsertUser } from '@/lib/functions/users';
 import { useToast } from '@/hooks/use-toast';
 
-const roles: Role[] = ['admin', 'manager', 'cashier', 'waiter', 'kitchen'];
-
 const userFormSchema = z.object({
   id: z.string().min(1, 'ID is required.'),
   name: z.string().min(1, 'Name is required.').max(64, 'Name cannot exceed 64 characters.'),
-  role: z.enum(roles),
+  role: z.enum(ROLES),
   active: z.boolean(),
   hourlyRateZar: z.string().refine(val => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, {
     message: "Hourly rate must be a non-negative number.",
@@ -169,7 +168,7 @@ export function UserFormDrawer({ isOpen, onClose, onSaveSuccess, user, currentUs
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {roles.map((role) => (
+                      {ROLES.map((role) => (
                         <SelectItem key={role} value={role} className="capitalize">{role}</SelectItem>
                       ))}
                     </SelectContent>
@@ -206,7 +205,6 @@ export function UserFormDrawer({ isOpen, onClose, onSaveSuccess, user, currentUs
                      <FormControl>
                         <Switch
                           id="user-active"
-                          autoComplete="off"
                           checked={field.value}
                           onCheckedChange={field.onChange}
                         />

@@ -17,9 +17,11 @@ import { CashMovementModal } from '@/components/admin/cash-register/CashMovement
 import { call } from '@/lib/functions/call';
 import { useToast } from '@/hooks/use-toast';
 
+type ZSummary = { overShort: number; };
+
 export default function CashRegisterPage() {
     const { profile } = useAuth();
-    const { toast } = useToast();
+    const { toast } = use-toast();
     const [registers, setRegisters] = useState<Register[]>([]);
     const [sessions, setSessions] = useState<RegisterSession[]>([]);
     const [movements, setMovements] = useState<CashMovement[]>([]);
@@ -72,7 +74,7 @@ export default function CashRegisterPage() {
             return;
         }
         try {
-            const result = await call('manageRegisterSession', { action: 'close', sessionId: openSession.id, countedCash: counted * 100 });
+            const result = (await call('manageRegisterSession', { action: 'close', sessionId: openSession.id, countedCash: counted * 100 })) as ZSummary;
             toast({ 
                 title: "Register session closed",
                 description: `Variance (Over/Short): ${fmtZAR(result.overShort)}`
@@ -83,15 +85,15 @@ export default function CashRegisterPage() {
     };
 
     return (
-        <div className="p-6 space-y-6">
+        <div class="p-6 space-y-6">
             <Card>
                 <CardHeader>
-                    <div className="flex justify-between items-start">
+                    <div class="flex justify-between items-start">
                         <div>
                             <CardTitle>Cash Register</CardTitle>
                             <CardDescription>Manage cash drawer sessions and movements.</CardDescription>
                         </div>
-                        <div className="flex gap-2">
+                        <div class="flex gap-2">
                            {openSession ? (
                                 <>
                                     <Button variant="outline" onClick={() => setMoveModal('payin')}>Pay In</Button>
@@ -100,7 +102,7 @@ export default function CashRegisterPage() {
                                 </>
                            ) : (
                                 <Button onClick={() => setOpenModal(true)}>
-                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                    <PlusCircle class="mr-2 h-4 w-4" />
                                     Open New Session
                                 </Button>
                            )}
@@ -109,25 +111,25 @@ export default function CashRegisterPage() {
                 </CardHeader>
                 <CardContent>
                     {openSession && (
-                         <Card className="mb-6 bg-green-900/20 border-green-700">
+                         <Card class="mb-6 bg-green-900/20 border-green-700">
                             <CardHeader>
                                 <CardTitle>Current Open Session</CardTitle>
                                 <CardDescription>Opened by {openSession.openedBy.name} at {format(openSession.openedAt.toDate(), 'PPpp')}</CardDescription>
                             </CardHeader>
-                            <CardContent className="grid md:grid-cols-3 gap-4">
+                            <CardContent class="grid md:grid-cols-3 gap-4">
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Opening Float</p>
-                                    <p className="text-lg font-bold">{fmtZAR(openSession.openingFloat)}</p>
+                                    <p class="text-sm text-muted-foreground">Opening Float</p>
+                                    <p class="text-lg font-bold">{fmtZAR(openSession.openingFloat)}</p>
                                 </div>
                                  <div>
-                                    <p className="text-sm text-muted-foreground">Expected in Drawer</p>
-                                    <p className="text-lg font-bold">{fmtZAR(openSession.expectedCash)}</p>
+                                    <p class="text-sm text-muted-foreground">Expected in Drawer</p>
+                                    <p class="text-lg font-bold">{fmtZAR(openSession.expectedCash)}</p>
                                 </div>
                             </CardContent>
                         </Card>
                     )}
                     
-                    <div className="grid md:grid-cols-2 gap-6">
+                    <div class="grid md:grid-cols-2 gap-6">
                         <Card>
                             <CardHeader><CardTitle>Recent Cash Movements</CardTitle></CardHeader>
                             <CardContent>
@@ -137,7 +139,7 @@ export default function CashRegisterPage() {
                                             <TableRow>
                                                 <TableHead>Time</TableHead>
                                                 <TableHead>Type</TableHead>
-                                                <TableHead className="text-right">Amount</TableHead>
+                                                <TableHead class="text-right">Amount</TableHead>
                                                 <TableHead>Reason</TableHead>
                                             </TableRow>
                                         </TableHeader>
@@ -146,14 +148,14 @@ export default function CashRegisterPage() {
                                                 <TableRow key={m.id}>
                                                     <TableCell>{format(m.createdAt.toDate(), 'p')}</TableCell>
                                                     <TableCell><Badge variant={m.type === 'payin' ? 'default' : 'secondary'}>{m.type}</Badge></TableCell>
-                                                    <TableCell className={`text-right font-mono ${m.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>{fmtZAR(m.amount)}</TableCell>
+                                                    <TableCell class={`text-right font-mono ${m.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>{fmtZAR(m.amount)}</TableCell>
                                                     <TableCell>{m.reason}</TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>
                                     </Table>
                                 ) : (
-                                    <p className="text-muted-foreground text-center py-4">No movements in the current session.</p>
+                                    <p class="text-muted-foreground text-center py-4">No movements in the current session.</p>
                                 )}
                             </CardContent>
                         </Card>
@@ -166,7 +168,7 @@ export default function CashRegisterPage() {
                                             <TableRow>
                                                 <TableHead>Date</TableHead>
                                                 <TableHead>Status</TableHead>
-                                                <TableHead className="text-right">Variance</TableHead>
+                                                <TableHead class="text-right">Variance</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -174,7 +176,7 @@ export default function CashRegisterPage() {
                                                  <TableRow key={s.id}>
                                                     <TableCell>{format(s.openedAt.toDate(), 'PP')}</TableCell>
                                                     <TableCell><Badge variant={s.status === 'open' ? 'default' : 'outline'}>{s.status}</Badge></TableCell>
-                                                    <TableCell className="text-right font-mono">
+                                                    <TableCell class="text-right font-mono">
                                                         {s.status === 'closed' ? fmtZAR(s.overShort ?? 0) : '—'}
                                                     </TableCell>
                                                 </TableRow>
@@ -182,7 +184,7 @@ export default function CashRegisterPage() {
                                         </TableBody>
                                      </Table>
                                 ) : (
-                                    <p className="text-muted-foreground text-center py-4">No session history.</p>
+                                    <p class="text-muted-foreground text-center py-4">No session history.</p>
                                 )}
                              </CardContent>
                         </Card>

@@ -23,6 +23,19 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["next-env.d.ts", "src/**/*", "scripts/**/*", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "next-env.d.ts",
+    "src/app/**/*",
+    "src/components/**/*",
+    "src/lib/**/*"
+  ],
+  "exclude": [
+    "functions",
+    "src/functions",
+    "src/ai",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    ".next",
+    "node_modules"
+  ]
 }

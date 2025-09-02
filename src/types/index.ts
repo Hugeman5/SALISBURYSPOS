@@ -1,7 +1,8 @@
 
 import type { Timestamp } from 'firebase/firestore';
 
-export type Role = 'admin'|'manager'|'cashier'|'waiter'|'kitchen';
+export const ROLES = ['admin', 'manager', 'cashier', 'waiter', 'kitchen'] as const;
+export type Role = typeof ROLES[number];
 
 export type User = {
   id: string;
