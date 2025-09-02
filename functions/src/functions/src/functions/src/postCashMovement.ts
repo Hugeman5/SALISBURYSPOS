@@ -1,6 +1,6 @@
 import {onCall as onCallMove} from "firebase-functions/v2/https";
 import {getFirestore as getDbMove, FieldValue} from "firebase-admin/firestore";
-import {CASH_PAYOUT_APPROVAL_CENTS} from "./config";
+import {CASH_PAYOUT_APPROVAL_CENTS} from "../../config";
 
 
 export const postCashMovement = onCallMove<{ sessionId?: string; locationId?: string; amountCents: number; direction: "in"|"out"; reason: string; note?: string }>(async (req) => {

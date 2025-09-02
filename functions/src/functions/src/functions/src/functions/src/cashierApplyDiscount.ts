@@ -1,6 +1,6 @@
 import {onCall as onCallDisc} from "firebase-functions/v2/https";
 import {getFirestore as getDbDisc, FieldValue as FV} from "firebase-admin/firestore";
-import {DISCOUNT_APPROVAL_PERCENT} from "./config";
+import {DISCOUNT_APPROVAL_PERCENT} from "../../../../config";
 
 
 export const cashierApplyDiscount = onCallDisc<{ orderId: string; lineId: string; discountType: "percent"|"amount"|"comp"|"promo"|"bogo"; discountValue: number; reason?: string }>(async (req) => {
