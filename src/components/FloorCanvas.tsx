@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 
 type Node = {
   id: string; name: string; x: number; y: number; w: number; h: number;
@@ -53,7 +53,7 @@ export default function FloorCanvas({
       className="relative border rounded"
       style={{
         width:size.w, height:size.h,
-        backgroundImage: background ? `url(${background})` : undefined,
+        backgroundImage: background ? `url(${background})` : 'none',
         backgroundSize: 'cover'
       }}
     >
