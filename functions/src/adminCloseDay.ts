@@ -22,6 +22,7 @@ interface RegisterSession {
   openingFloatCents?: number;
   closingFloatCents?: number;
   cashMovementsCents?: number;
+  returnsCents?: number;
 }
 
 export const adminCloseDay = onCall<CloseDayPayload>(async (req) => {

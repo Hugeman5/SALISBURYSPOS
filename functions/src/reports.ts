@@ -8,6 +8,25 @@ import * as admin from "firebase-admin";
 import {Timestamp} from "firebase-admin/firestore";
 import {db, requireRole} from "./utils";
 
+interface OrderPayment {
+    type: string;
+    amount: number;
+}
+
+interface OrderData {
+    status: string;
+    totals?: {
+        totalInc?: number;
+        vat?: number;
+        subTotalEx?: number;
+    };
+    discounts?: {
+        total?: number;
+    };
+    isReturn?: boolean;
+    payments?: OrderPayment[];
+}
+
 /**
  * Creates a time window for a given date in the Africa/Johannesburg timezone.
  * @param {string} [dateStr] - The date in 'YYYY-MM-DD' format.
@@ -67,7 +86,7 @@ export const adminCloseDay = onCall({cors: true}, async (req) => {
   };
 
   snap.forEach((doc) => {
-    const d = doc.data() as any;
+    const d = doc.data() as OrderData;
     if (d.status !== "paid") return;
     const gross = Number(d.totals?.totalInc || 0);
     totals.countPaid++;
@@ -77,7 +96,7 @@ export const adminCloseDay = onCall({cors: true}, async (req) => {
     totals.discounts += Number(d.discounts?.total || 0);
     if (d.isReturn) totals.returns += gross;
 
-    (d.payments || []).forEach((p: {type: string, amount: number}) => {
+    (d.payments || []).forEach((p: OrderPayment) => {
       if (p.type === "cash") totals.cash += p.amount;
       else if (p.type === "card") totals.card += p.amount;
       else totals.other += p.amount;

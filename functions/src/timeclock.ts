@@ -125,6 +125,7 @@ export const adminExportTimeCsv = onCall({cors: true}, async (req) => {
   const byUser: Record<string, { totalSecs: number; totalCost: number; }> = {};
 
   snap.forEach((doc) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const s = doc.data() as any;
     const inMs = (s.inAt as Timestamp).toMillis();
     const outMs = s.outAt ? (s.outAt as Timestamp).toMillis() : null;

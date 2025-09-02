@@ -175,7 +175,7 @@ export const adminBulkImportProducts = onCall({cors: true}, async (req) => {
   const lines = csv.trim().split(/\r?\n/);
   if (lines.length < 2) return {ok: true, imported: 0};
 
-  const [header, ...rows] = lines;
+  const [header, ...rowLines] = lines;
   const head = header.split(",").map((s) => s.trim().toLowerCase());
   const idx = (k: string) => head.indexOf(k);
 
@@ -187,7 +187,7 @@ export const adminBulkImportProducts = onCall({cors: true}, async (req) => {
   }
 
   let imported = 0;
-  for (const row of rows) {
+  for (const row of rowLines) {
     if (!row.trim()) continue;
     const p = row.split(",").map((s) => s.trim());
     const input: UpsertInput = {
