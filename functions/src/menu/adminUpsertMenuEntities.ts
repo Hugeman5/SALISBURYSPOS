@@ -26,7 +26,7 @@ export const adminUpsertMenuEntities = onCall(async (req) => {
     const id = docData.id || db.collection(collection).doc().id;
     await db.doc(`${collection}/${id}`).set({
       ...docData,
-      id,
+      id, // ensure id is written to the document
       createdAt: docData.createdAt || now,
       updatedAt: now,
     }, { merge: true });

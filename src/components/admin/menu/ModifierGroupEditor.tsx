@@ -17,7 +17,14 @@ export function ModifierGroupEditor({ modifierGroup, onFormChange }: ModifierGro
     
     const handleItemChange = (index: number, field: string, value: any) => {
         const newItems = [...modifierGroup.items];
-        newItems[index] = { ...newItems[index], [field]: value };
+        const currentItem = { ...newItems[index] };
+        
+        if (field === 'priceDeltaCents') {
+            currentItem.priceDeltaCents = Math.round(parseFloat(value) * 100);
+        } else {
+            (currentItem as any)[field] = value;
+        }
+        newItems[index] = currentItem;
         onFormChange('items', newItems);
     };
 
@@ -65,8 +72,8 @@ export function ModifierGroupEditor({ modifierGroup, onFormChange }: ModifierGro
                              type="number"
                              placeholder="Price +/-"
                              className="w-28"
-                             value={(item as any).priceDeltaZar ?? (item.priceDeltaCents / 100).toFixed(2)}
-                             onChange={(e) => handleItemChange(index, 'priceDeltaZar', e.target.value)}
+                             value={(item.priceDeltaCents / 100).toFixed(2)}
+                             onChange={(e) => handleItemChange(index, 'priceDeltaCents', e.target.value)}
                            />
                            <Button variant="ghost" size="icon" onClick={() => removeItem(index)}>
                                <Trash2 className="h-4 w-4"/>

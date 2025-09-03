@@ -36,6 +36,7 @@ export type Product = {
       exCents: number;
     };
     priceCents: number; // for menu items
+    taxRate?: number; // for menu items
     costIncCents?: number | null;
     createdAt: Timestamp;
     updatedAt: Timestamp;
@@ -112,5 +113,3 @@ export type ZClosure = {
   perRegister: { [key: string]: { sessions: number; cashMovementsTotal: number; overShort: number } };
   notes?: string;
 };
-
-    

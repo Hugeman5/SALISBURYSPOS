@@ -35,7 +35,9 @@ export function ItemEditor({ item, modifierGroups, onFormChange }: ItemEditorPro
                 </div>
                  <div>
                     <Label>Price (ZAR)</Label>
-                    <Input type="number" value={(item as any).priceZar ?? (item.priceCents/100).toFixed(2)} onChange={e => onFormChange('priceZar', e.target.value)} />
+                    <Input type="number" 
+                           value={(item.priceCents / 100).toFixed(2)} 
+                           onChange={e => onFormChange('priceCents', Math.round(parseFloat(e.target.value) * 100))} />
                 </div>
             </div>
             <div className="flex items-center space-x-2">

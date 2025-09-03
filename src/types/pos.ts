@@ -1,3 +1,4 @@
+
 import type { Timestamp } from 'firebase/firestore';
 
 export type Role = 'admin' | 'manager' | 'cashier' | 'waiter' | 'kitchen';
@@ -139,7 +140,7 @@ export type MenuId = string;
 export interface Menu { id: MenuId; name: string; description?: string; order: number; active: boolean; deviceIds?: DeviceId[]; default?: boolean; createdAt: string; updatedAt: string; }
 export interface MenuScreen { id: string; menuId: MenuId; name: string; color?: string; order: number; parentScreenId?: string | null; }
 export interface MenuButton { id: string; menuId: MenuId; screenId: string; type: 'item'|'combo'|'discount'|'instruction'|'order_profile'|'submenu'; refId?: string; label?: string; color?: string; order: number; }
-export interface Item { id: string; name: string; sku?: string; plu?: string; categoryId?: string; priceCents: number; taxRate?: number; imageUrl?: string; active: boolean; printerRouteIds?: string[]; tags?: string[]; modifierGroupIds?: string[]; createdAt: string; updatedAt: string; }
+export interface Item { id: string; name: string; sku?: string; plu?: string; categoryId: string; priceCents: number; taxRate: number; imageUrl?: string; active: boolean; printerRouteIds?: string[]; tags?: string[]; modifierGroupIds?: string[]; createdAt: string; updatedAt: string; }
 export interface ModifierGroup { id: string; name: string; min: number; max: number; items: { id: string; name: string; priceDeltaCents: number; active: boolean }[]; active: boolean; }
 export interface Combo { id: string; name: string; priceCents: number; groups: { name: string; required: boolean; min: number; max: number; options: { itemId: string }[] }[]; active: boolean; }
 export interface PriceRule { id: string; name: string; type: 'percent_discount'|'percent_surcharge'|'absolute_adjust'; value: number; appliesTo: { itemIds?: string[]; categoryIds?: string[] };

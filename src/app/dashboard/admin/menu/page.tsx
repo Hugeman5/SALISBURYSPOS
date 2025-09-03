@@ -108,25 +108,11 @@ export default function MenuBuilderPage() {
     try {
         let payload: any = { ...editingEntity };
         // Clean up internal `type` property before sending
+        const entityType = payload.type;
         delete payload.type;
-
-        // Convert price from ZAR float to cents for items
-        if ('priceZar' in payload) {
-            payload.priceCents = Math.round(parseFloat(payload.priceZar || '0') * 100);
-            delete payload.priceZar;
-        }
         
-        // Convert modifier item prices
-        if (payload.items) {
-            payload.items = payload.items.map((item: any) => {
-                const priceDeltaCents = Math.round(parseFloat(item.priceDeltaZar || '0') * 100);
-                delete item.priceDeltaZar;
-                return { ...item, priceDeltaCents };
-            });
-        }
-        
-        await adminUpsertMenuEntity({ entity: editingEntity.type as any, data: payload });
-        toast({ title: `${editingEntity.type.replace('_', ' ')} saved successfully` });
+        await adminUpsertMenuEntity({ entity: entityType, data: payload });
+        toast({ title: `${entityType.replace('_', ' ')} saved successfully` });
     } catch (error: any) {
         toast({ variant: 'destructive', title: 'Save failed', description: error.message });
     }
@@ -223,5 +209,3 @@ export default function MenuBuilderPage() {
     </div>
   );
 }
-
-    
