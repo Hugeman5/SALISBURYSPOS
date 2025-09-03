@@ -2,7 +2,7 @@
  * @fileoverview Cloud Functions for product and category management.
  */
 
-import {onCall, HttpsError} from "firebase-functions/v2/https";
+import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {db, requireRole} from "./utils";
 
@@ -128,22 +128,22 @@ async function upsertProductCore(input: UpsertInput) {
 }
 
 /** Callable to upsert a single product. */
-export const adminUpsertProduct = onCall({cors: true}, async (req) => {
+export const adminUpsertProduct = async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   return upsertProductCore(req.data);
-});
+};
 
 /** Callable to delete a single product. */
-export const adminDeleteProduct = onCall({cors: true}, async (req) => {
+export const adminDeleteProduct = async (req: CallableRequest) => {
   requireRole(req, ["admin"]);
   const {id} = req.data;
   if (!id) throw new HttpsError("invalid-argument", "Product ID is required.");
   await db.collection("products").doc(id).delete();
   return {ok: true};
-});
+};
 
 /** Callable to export all products to a CSV string. */
-export const adminExportProducts = onCall({cors: true}, async (req) => {
+export const adminExportProducts = async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   const snap = await db.collection("products").orderBy("nameLower").get();
   const rows: string[] = [
@@ -163,10 +163,10 @@ export const adminExportProducts = onCall({cors: true}, async (req) => {
     ].join(","));
   }
   return {ok: true, csv: rows.join("\n")};
-});
+};
 
 /** Callable to bulk import products from a CSV string. */
-export const adminBulkImportProducts = onCall({cors: true}, async (req) => {
+export const adminBulkImportProducts = async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   const csv: string = req.data?.csv || "";
   if (!csv) throw new HttpsError("invalid-argument", "CSV data is required.");
@@ -202,4 +202,4 @@ export const adminBulkImportProducts = onCall({cors: true}, async (req) => {
     imported++;
   }
   return {ok: true, imported};
-});
+};

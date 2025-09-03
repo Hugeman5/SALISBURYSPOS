@@ -2,15 +2,15 @@
  * @fileoverview Cloud Functions for cash register session management.
  */
 
-import {onCall, HttpsError} from "firebase-functions/v2/https";
+import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import {db, requireRole} from "./utils";
+import { db, requireRole } from "./utils";
 
 /**
  * Manages cash register sessions (opening and closing).
  * This function is dispatched based on the 'action' property in the payload.
  */
-export const manageRegisterSession = onCall({cors: true}, async (req) => {
+export const manageRegisterSession = async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
@@ -73,13 +73,13 @@ export const manageRegisterSession = onCall({cors: true}, async (req) => {
   }
 
   throw new HttpsError("invalid-argument", "Invalid action specified.");
-});
+};
 
 /**
  * Records a cash movement (pay-in or pay-out) for an open session.
  * This function transactionally updates the session's expected cash total.
  */
-export const postCashMovement = onCall({cors: true}, async (req) => {
+export const postCashMovement = async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
@@ -117,4 +117,4 @@ export const postCashMovement = onCall({cors: true}, async (req) => {
   });
 
   return {ok: true};
-});
+};

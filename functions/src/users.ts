@@ -1,9 +1,8 @@
-
 /**
  * @fileoverview User and authentication management functions.
  */
 
-import {onCall, HttpsError} from "firebase-functions/v2/https";
+import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as bcrypt from "bcryptjs";
@@ -24,7 +23,7 @@ const UpsertUserPayloadSchema = z.object({
  * @param {object} req The request object.
  * @return {Promise<{ok: true, id: string}>} A promise that resolves on success.
  */
-export const adminUpsertUser = onCall({cors: true}, async (req) => {
+export const adminUpsertUser = async (req: CallableRequest) => {
   const actorRole = requireRole(req, ["admin", "manager"]);
   const result = UpsertUserPayloadSchema.safeParse(req.data);
   if (!result.success) {
@@ -69,7 +68,7 @@ export const adminUpsertUser = onCall({cors: true}, async (req) => {
   }
 
   return {ok: true, id: userId};
-});
+};
 
 /**
  * A callable function for admins/managers to deactivate a user account.
@@ -77,12 +76,12 @@ export const adminUpsertUser = onCall({cors: true}, async (req) => {
  * @param {object} req The request object.
  * @return {Promise<{ok: true, id: string}>} A promise that resolves on success.
  */
-export const adminDeleteUser = onCall({cors: true}, async (req) => {
+export const adminDeleteUser = async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   const {id} = z.object({id: z.string().min(1)}).parse(req.data);
   await db.collection("users").doc(id).update({active: false});
   return {ok: true, id};
-});
+};
 
 const SetPinPayloadSchema = z.object({
   id: z.string().min(1),
@@ -94,7 +93,7 @@ const SetPinPayloadSchema = z.object({
  * @param {object} req The request object.
  * @return {Promise<{ok: true}>} A promise that resolves on success.
  */
-export const adminSetUserPin = onCall({cors: true}, async (req) => {
+export const adminSetUserPin = async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   const {id, pin} = SetPinPayloadSchema.parse(req.data);
 
@@ -136,4 +135,4 @@ export const adminSetUserPin = onCall({cors: true}, async (req) => {
     );
 
   return {ok: true};
-});
+};

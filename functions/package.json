@@ -1,9 +1,9 @@
 {
   "name": "salisburys-functions",
   "private": true,
-  "main": "lib/index.js",
   "type": "module",
   "engines": { "node": ">=18" },
+  "main": "lib/index.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "watch": "tsc -w -p tsconfig.json"

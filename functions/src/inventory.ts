@@ -1,8 +1,7 @@
 /**
  * @fileoverview Cloud Functions for inventory and stock management.
  */
-
-import {onCall, HttpsError} from "firebase-functions/v2/https";
+import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {format} from "date-fns";
 import {db, requireRole} from "./utils";
@@ -15,7 +14,7 @@ type MovementType = "receive" | "sale" | "refund" | "wastage" |
  * Posts a stock movement to the inventory ledger and updates the product's
  * stock-on-hand count in a single transaction. Supports idempotency.
  */
-export const adminPostStockMovement = onCall({cors: true}, async (req) => {
+export const adminPostStockMovement = async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   const uid = req.auth?.uid;
   if (!uid) {
@@ -96,12 +95,12 @@ export const adminPostStockMovement = onCall({cors: true}, async (req) => {
   });
 
   return {ok: true, before, after, delta, ledgerId: ledgerRef.id};
-});
+};
 
 /**
  * Exports the inventory ledger to a CSV file, with optional filters.
  */
-export const adminExportLedger = onCall({cors: true}, async (req) => {
+export const adminExportLedger = async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager"]);
   const data = req.data;
   const {productId, type, fromTs, toTs} = data;
@@ -142,4 +141,4 @@ export const adminExportLedger = onCall({cors: true}, async (req) => {
     filename: `inventory-ledger-${format(new Date(), "yyyyMMdd-HHmm")}.csv`,
     mime: "text/csv", dataBase64,
   };
-});
+};

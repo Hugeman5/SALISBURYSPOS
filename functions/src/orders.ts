@@ -1,9 +1,8 @@
-
 /**
  * @fileoverview Cloud Functions for order management and processing.
  */
 
-import {onCall, HttpsError} from "firebase-functions/v2/https";
+import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {z} from "zod";
 import {db, requireRole} from "./utils";
@@ -74,7 +73,7 @@ async function getProductsByIds(ids: string[]) {
 }
 
 /** Creates a new order with a status of "open". */
-export const cashierCreateOrder = onCall({cors: true}, async (req) => {
+export const cashierCreateOrder = async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager", "cashier"]);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
@@ -92,10 +91,10 @@ export const cashierCreateOrder = onCall({cors: true}, async (req) => {
     currency: "ZAR", vatRate: VAT_RATE, note: note ?? null,
   });
   return {ok: true, orderId: orderRef.id};
-});
+};
 
 /** Sets or replaces the items in an order, recalculating totals. */
-export const cashierSetItems = onCall({cors: true}, async (req) => {
+export const cashierSetItems = async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager", "cashier"]);
   const {orderId, items: cartItems} = setItemsSchema.parse(req.data);
   const productIds = [...new Set(cartItems.map((i) => i.productId))];
@@ -128,10 +127,10 @@ export const cashierSetItems = onCall({cors: true}, async (req) => {
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
   return {ok: true, totals: {subTotalEx: subEx, vat, totalInc: inc}};
-});
+};
 
 /** Adds a payment record to an order. */
-export const cashierTakePayment = onCall({cors: true}, async (req) => {
+export const cashierTakePayment = async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager", "cashier"]);
   const {orderId, type, amount} = takePaymentSchema.parse(req.data);
   const payment = {
@@ -140,10 +139,10 @@ export const cashierTakePayment = onCall({cors: true}, async (req) => {
   await db.collection("orders").doc(orderId)
     .update({payments: admin.firestore.FieldValue.arrayUnion(payment)});
   return {ok: true};
-});
+};
 
 /** Closes an order, validates payment, and creates inventory movements. */
-export const cashierCloseOrder = onCall({cors: true}, async (req) => {
+export const cashierCloseOrder = async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager", "cashier"]);
   const {orderId} = closeOrderSchema.parse(req.data);
   const uid = req.auth?.uid;
@@ -229,10 +228,10 @@ export const cashierCloseOrder = onCall({cors: true}, async (req) => {
     tx.update(orderRef, orderUpdate);
   });
   return {ok: true};
-});
+};
 
 /** Processes an itemized refund for a paid order. */
-export const cashierRefundItems = onCall({cors: true}, async (req) => {
+export const cashierRefundItems = async (req: CallableRequest) => {
   requireRole(req, ["admin", "manager", "cashier"]);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
@@ -337,4 +336,4 @@ export const cashierRefundItems = onCall({cors: true}, async (req) => {
     refundId: refundRef.id,
     totalInc: totalRefundAmount,
   };
-});
+};
