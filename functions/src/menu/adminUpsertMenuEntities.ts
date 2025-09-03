@@ -3,6 +3,14 @@
 import { onCall } from 'firebase-functions/v2/https';
 import { getFirestore } from 'firebase-admin/firestore';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mapModifierItem = (x: any) => ({
+    id: x.id || `${Date.now()}_${Math.random()}`,
+    name: x.name,
+    priceDeltaCents: Math.round(x.priceDeltaCents || 0),
+    active: x.active ?? true,
+});
+
 export const adminUpsertMenuEntities = onCall(async (req) => {
   const ctx = req.auth;
   if (!ctx) throw new Error('UNAUTH');
@@ -47,12 +55,7 @@ export const adminUpsertMenuEntities = onCall(async (req) => {
         modifierGroupIds: data.modifierGroupIds || [],
       });
     case 'modifier_group':
-       const items = (data.items || []).map((x: any) => ({
-        id: x.id || `${Date.now()}_${Math.random()}`,
-        name: x.name,
-        priceDeltaCents: Math.round(x.priceDeltaCents || 0),
-        active: x.active ?? true,
-      }));
+       const items = (data.items || []).map(mapModifierItem);
       return upsert('modifier_groups', {
         name: data.name,
         min: data.min ?? 0,

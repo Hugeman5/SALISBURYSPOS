@@ -45,8 +45,8 @@ export type Product = {
 export type Category = {
     id: string;
     name: string;
-    nameLower: string;
-    sort: number;
+    active: boolean;
+    order: number;
 };
 
 export type MovementType = 'receive' | 'sale' | 'refund' | 'wastage' | 'adjust' | 'set';
