@@ -32,6 +32,14 @@
         { "fieldPath": "active", "order": "DESCENDING" },
         { "fieldPath": "name",   "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "sessions",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "inAt", "order": "ASCENDING" },
+        { "fieldPath": "outAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

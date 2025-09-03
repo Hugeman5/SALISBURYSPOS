@@ -1,4 +1,3 @@
-
 import { onCall } from 'firebase-functions/v2/https';
 
 export const getSignedUploadUrl = onCall(async (req) => {

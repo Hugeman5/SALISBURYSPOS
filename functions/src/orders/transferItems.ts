@@ -1,4 +1,3 @@
-
 import { onCall } from 'firebase-functions/v2/https';
 
 export const transferItems = onCall(async (req) => {
