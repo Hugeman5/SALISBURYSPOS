@@ -20,7 +20,7 @@ export default function CloseDayPage(){
     setResult(null);
     try {
       const r: any = await call('adminCloseDay', { locationId, date });
-      setResult(r.data);
+      setResult(r);
       toast({ title: "Z-Closure Generated", description: `Report ID: ${r.id}` });
     } catch (e:any) {
       toast({ variant: 'destructive', title: 'Operation Failed', description: e.message || 'An unknown error occurred' });
