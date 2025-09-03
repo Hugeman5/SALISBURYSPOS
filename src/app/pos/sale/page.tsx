@@ -3,11 +3,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   collection,
-  getDocs,
   query,
   where,
   orderBy,
-  limit,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/stores/auth-store';
@@ -33,41 +32,39 @@ export default function SalePage() {
   const debouncedSearchTerm = useDebounce(searchTerm, 250);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
+  useEffect(() => {
     setLoading(true);
-    try {
-      const catQuery = query(collection(db, 'menu_categories'), orderBy('order'));
-      const prodQuery = query(
-        collection(db, 'menu_items'),
-        where('active', '==', true),
-        orderBy('name')
-      );
+    
+    const catQuery = query(collection(db, 'menu_categories'), orderBy('order'));
+    const prodQuery = query(
+      collection(db, 'menu_items'),
+      where('active', '==', true),
+      orderBy('name')
+    );
 
-      const [catSnap, prodSnap] = await Promise.all([
-        getDocs(catQuery),
-        getDocs(prodQuery),
-      ]);
-
+    const unsubCategories = onSnapshot(catQuery, (catSnap) => {
       const categoriesData = catSnap.docs.map(
         (doc) => ({ id: doc.id, ...doc.data() } as Category)
       );
+      setCategories([{ id: 'all', name: 'All Products', active: true, order: -1 }, ...categoriesData]);
+      if (!activeCategoryId) {
+        setActiveCategoryId('all');
+      }
+    });
+
+    const unsubProducts = onSnapshot(prodQuery, (prodSnap) => {
       const productsData = prodSnap.docs.map(
         (doc) => ({ id: doc.id, ...doc.data() } as Product)
       );
-
-      setCategories([{ id: 'all', name: 'All Products', active: true, order: -1 }, ...categoriesData]);
       setProducts(productsData);
-      setActiveCategoryId('all');
-    } catch (error) {
-      console.error('Error fetching products or categories:', error);
-    } finally {
       setLoading(false);
-    }
-  }, []);
+    });
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    return () => {
+      unsubCategories();
+      unsubProducts();
+    };
+  }, [activeCategoryId]);
 
   const filteredProducts = useMemo(() => {
     let filtered = products;
@@ -144,5 +141,3 @@ export default function SalePage() {
     </RoleGate>
   );
 }
-
-    

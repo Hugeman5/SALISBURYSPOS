@@ -36,6 +36,7 @@ export const adminUpsertMenuEntities = onCall(async (req) => {
   switch (entity) {
     case 'category':
         return upsert('menu_categories', {
+            id: data.id,
             name: data.name,
             color: data.color || null,
             order: data.order ?? 0,
@@ -43,6 +44,7 @@ export const adminUpsertMenuEntities = onCall(async (req) => {
         });
     case 'item':
       return upsert('menu_items', {
+        id: data.id,
         name: data.name,
         sku: data.sku || null,
         plu: data.plu || null,
@@ -57,6 +59,7 @@ export const adminUpsertMenuEntities = onCall(async (req) => {
     case 'modifier_group':
        const items = (data.items || []).map(mapModifierItem);
       return upsert('modifier_groups', {
+        id: data.id,
         name: data.name,
         min: data.min ?? 0,
         max: data.max ?? 1,
@@ -67,5 +70,3 @@ export const adminUpsertMenuEntities = onCall(async (req) => {
       throw new Error('BAD_ENTITY');
   }
 });
-
-    
