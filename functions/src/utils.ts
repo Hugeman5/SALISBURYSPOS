@@ -6,11 +6,6 @@
 import * as admin from "firebase-admin";
 import {HttpsError, type CallableRequest} from "firebase-functions/v2/https";
 
-// --- Initialize Admin once (safe if called multiple times) ---
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
 /** The Firestore database instance. */
 export const db = admin.firestore();
 

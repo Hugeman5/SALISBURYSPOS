@@ -27,7 +27,7 @@ export interface MenuScreen {
   parentScreenId?: string | null;
 }
 
-export type ButtonType = 'item' | 'combo' | 'discount' | 'instruction' | 'order_profile' | 'submenu';
+export type ButtonType = 'item'|'combo'|'discount'|'instruction'|'order_profile'|'submenu'|'category';
 
 export interface MenuButton {
   id: string;

@@ -1,15 +1,19 @@
 {
   "name": "salisburys-functions",
   "private": true,
-  "engines": { "node": "20" },
   "main": "lib/index.js",
+  "type": "module",
+  "engines": { "node": ">=18" },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "watch": "tsc -w -p tsconfig.json"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "date-fns": "^3.6.0",
     "firebase-admin": "^12",
-    "firebase-functions": "^5"
+    "firebase-functions": "^5",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "typescript": "^5",
