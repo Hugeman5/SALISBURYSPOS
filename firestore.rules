@@ -1,71 +1,58 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
   
-    // Helper functions to get user auth state
-    function authed() { return request.auth != null; }
-    function role() { return request.auth.token.role; }
-    function isOneOf(allowed_roles) { return authed() && role() in allowed_roles; }
-    function isAdmin() { return isOneOf(['admin']); }
-    function isManager() { return isOneOf(['admin', 'manager']); }
-    function isStaff() { return isOneOf(['admin', 'manager', 'cashier', 'waiter', 'kitchen']); }
-
-    // PUBLIC: Login page needs this
+    // Login: Allow public read of users for login screen
     match /users/{uid} {
       allow read: if true;
-      allow write: if isManager();
+      allow write: if request.auth != null && request.auth.token.role in ['admin', 'manager'];
     }
+    
+    // User Secrets: Backend/Admin only
     match /user_secrets/{uid} {
-      allow read, write: if false; // Only backend access
+      allow read, write: if request.auth != null && request.auth.token.role in ['admin', 'manager'];
     }
 
-    // MENU & FLOOR
+    // Menu Data: Staff can read, managers/admins can write
     match /menu_categories/{id} {
-      allow read: if isStaff();
-      allow write: if isManager();
+      allow read: if request.auth != null && request.auth.token.role in ['admin', 'manager', 'cashier', 'waiter', 'kitchen'];
+      allow write: if request.auth != null && request.auth.token.role in ['admin', 'manager'];
     }
     match /menu_items/{id} {
-      allow read: if isStaff();
-      allow write: if isManager();
+      allow read: if request.auth != null && request.auth.token.role in ['admin', 'manager', 'cashier', 'waiter', 'kitchen'];
+      allow write: if request.auth != null && request.auth.token.role in ['admin', 'manager'];
     }
     match /modifier_groups/{id} {
-      allow read: if isStaff();
-      allow write: if isManager();
+      allow read: if request.auth != null && request.auth.token.role in ['admin', 'manager', 'cashier', 'waiter', 'kitchen'];
+      allow write: if request.auth != null && request.auth.token.role in ['admin', 'manager'];
     }
+
+    // Floor Plans & State: Staff can read, managers/admins can write plans, waiters+ can write state
     match /floor_plans/{id} {
-      allow read: if isStaff();
-      allow write: if isManager();
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.role in ['admin', 'manager'];
     }
     match /table_state/{id} {
-      allow read, write: if isStaff();
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.role in ['admin', 'manager', 'cashier', 'waiter'];
     }
-    
-    // PRODUCTS & INVENTORY (more restricted)
-    match /products/{id} {
-      allow read, write: if isManager();
-    }
-    match /inventory_ledger/{id} {
-      allow read, write: if isManager();
-    }
-    
-    // ORDERS & SESSIONS
+
+    // Orders and financial data should be more restrictive
     match /orders/{id} {
-      allow read, write: if isStaff();
+      allow read, write: if request.auth != null && request.auth.token.role in ['admin', 'manager', 'cashier', 'waiter'];
     }
-    match /register_sessions/{id} {
-      allow read, write: if isStaff();
-    }
-    match /cash_movements/{id} {
-      allow read, write: if isStaff();
-    }
-    match /time_clock/{id} {
-      allow read, write: if isStaff();
+    match /register_sessions/{id}/{any=**} {
+      allow read, write: if request.auth != null && request.auth.token.role in ['admin', 'manager', 'cashier'];
     }
     match /z_closures/{id} {
-      allow read, write: if isManager();
+      allow read, write: if request.auth != null && request.auth.token.role in ['admin', 'manager'];
+    }
+
+    // Default deny all other collections
+    match /{path=**} {
+      allow read, write: if false;
     }
   }
 }
-
-    
