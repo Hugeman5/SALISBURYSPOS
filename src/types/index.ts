@@ -22,9 +22,9 @@ export type User = {
 export type Product = {
     id: string;
     name: string;
-    nameLower: string;
+    nameLower?: string;
     sku: string;
-    skuUpper: string;
+    skuUpper?: string;
     barcode?: string | null;
     categoryId?: string | null;
     categoryName?: string | null;
@@ -35,6 +35,7 @@ export type Product = {
       incCents: number;
       exCents: number;
     };
+    priceCents: number; // for menu items
     costIncCents?: number | null;
     createdAt: Timestamp;
     updatedAt: Timestamp;
@@ -111,3 +112,5 @@ export type ZClosure = {
   perRegister: { [key: string]: { sessions: number; cashMovementsTotal: number; overShort: number } };
   notes?: string;
 };
+
+    

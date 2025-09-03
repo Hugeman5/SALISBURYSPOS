@@ -36,11 +36,11 @@ export default function SalePage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const catQuery = query(collection(db, 'categories'), orderBy('name'));
+      const catQuery = query(collection(db, 'menu_categories'), orderBy('order'));
       const prodQuery = query(
-        collection(db, 'products'),
+        collection(db, 'menu_items'),
         where('active', '==', true),
-        orderBy('nameLower')
+        orderBy('name')
       );
 
       const [catSnap, prodSnap] = await Promise.all([
@@ -55,7 +55,7 @@ export default function SalePage() {
         (doc) => ({ id: doc.id, ...doc.data() } as Product)
       );
 
-      setCategories([{ id: 'all', name: 'All Products', nameLower: 'all', sort: -1 }, ...categoriesData]);
+      setCategories([{ id: 'all', name: 'All Products', active: true, order: -1 }, ...categoriesData]);
       setProducts(productsData);
       setActiveCategoryId('all');
     } catch (error) {
@@ -81,7 +81,7 @@ export default function SalePage() {
       filtered = filtered.filter(
         (p) =>
           p.name.toLowerCase().includes(lowercasedTerm) ||
-          p.sku.toLowerCase().includes(lowercasedTerm)
+          (p.sku || '').toLowerCase().includes(lowercasedTerm)
       );
     }
 
@@ -144,3 +144,5 @@ export default function SalePage() {
     </RoleGate>
   );
 }
+
+    

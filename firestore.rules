@@ -2,81 +2,70 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+  
+    // Helper functions to get user auth state
+    function authed() { return request.auth != null; }
+    function role() { return request.auth.token.role; }
+    function isOneOf(allowed_roles) { return authed() && role() in allowed_roles; }
+    function isAdmin() { return isOneOf(['admin']); }
+    function isManager() { return isOneOf(['admin', 'manager']); }
+    function isStaff() { return isOneOf(['admin', 'manager', 'cashier', 'waiter', 'kitchen']); }
 
-    // Helper functions
-    function authed() {
-      return request.auth != null;
-    }
-    function role() {
-      return request.auth.token.role;
-    }
-    function isRole(r) {
-      return authed() && role() == r;
-    }
-    function isOneOfRoles(roles) {
-      return authed() && role() in roles;
-    }
-
-    // Login page needs to read all active users with PINs set
+    // PUBLIC: Login page needs this
     match /users/{uid} {
       allow read: if true;
-      allow write: if isOneOfRoles(['admin', 'manager']);
+      allow write: if isManager();
     }
-
-    // PIN hashes are private and only accessible via backend function
     match /user_secrets/{uid} {
-      allow read, write: if false;
+      allow read, write: if false; // Only backend access
     }
 
-    // Menu data can be read by any staff, written by managers/admins
+    // MENU & FLOOR
     match /menu_categories/{id} {
-      allow read: if isOneOfRoles(['admin', 'manager', 'cashier', 'waiter', 'kitchen']);
-      allow write: if isOneOfRoles(['admin', 'manager']);
+      allow read: if isStaff();
+      allow write: if isManager();
     }
     match /menu_items/{id} {
-      allow read: if isOneOfRoles(['admin', 'manager', 'cashier', 'waiter', 'kitchen']);
-      allow write: if isOneOfRoles(['admin', 'manager']);
+      allow read: if isStaff();
+      allow write: if isManager();
     }
     match /modifier_groups/{id} {
-      allow read: if isOneOfRoles(['admin', 'manager', 'cashier', 'waiter', 'kitchen']);
-      allow write: if isOneOfRoles(['admin', 'manager']);
+      allow read: if isStaff();
+      allow write: if isManager();
     }
-
-    // Floor plans can be read by any staff, written by managers/admins
     match /floor_plans/{id} {
-      allow read: if isOneOfRoles(['admin', 'manager', 'cashier', 'waiter', 'kitchen']);
-      allow write: if isOneOfRoles(['admin', 'manager']);
+      allow read: if isStaff();
+      allow write: if isManager();
     }
-    // Table state can be read/written by floor staff
     match /table_state/{id} {
-       allow read: if isOneOfRoles(['admin', 'manager', 'cashier', 'waiter', 'kitchen']);
-       allow write: if isOneOfRoles(['admin', 'manager', 'cashier', 'waiter']);
-    }
-
-    // Orders can be read/written by cashiers, managers, admins
-    match /orders/{id} {
-      allow read, write: if isOneOfRoles(['admin', 'manager', 'cashier']);
-    }
-
-    // Time clock entries can be created by any staff for themselves, read by managers/admins
-    match /time_clock/{uid} {
-      allow read, write: if isOneOfRoles(['admin', 'manager']);
-      match /sessions/{sessionId} {
-        allow read: if isOneOfRoles(['admin', 'manager']) || request.auth.uid == uid;
-        allow create: if request.auth.uid == uid;
-        allow update: if request.auth.uid == uid;
-      }
+      allow read, write: if isStaff();
     }
     
-    // Cash register sessions can be read/written by cashiers, managers, admins
+    // PRODUCTS & INVENTORY (more restricted)
+    match /products/{id} {
+      allow read, write: if isManager();
+    }
+    match /inventory_ledger/{id} {
+      allow read, write: if isManager();
+    }
+    
+    // ORDERS & SESSIONS
+    match /orders/{id} {
+      allow read, write: if isStaff();
+    }
     match /register_sessions/{id} {
-      allow read, write: if isOneOfRoles(['admin', 'manager', 'cashier']);
+      allow read, write: if isStaff();
     }
     match /cash_movements/{id} {
-      allow read, write: if isOneOfRoles(['admin', 'manager', 'cashier']);
+      allow read, write: if isStaff();
+    }
+    match /time_clock/{id} {
+      allow read, write: if isStaff();
     }
     match /z_closures/{id} {
-      allow read, write: if isOneOfRoles(['admin', 'manager']);
+      allow read, write: if isManager();
     }
   }
 }
+
+    

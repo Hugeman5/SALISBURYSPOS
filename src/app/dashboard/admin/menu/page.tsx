@@ -32,7 +32,7 @@ export default function MenuBuilderPage() {
     const unsubCategories = onSnapshot(query(collection(db, 'menu_categories'), orderBy('order')), snap => {
       setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() } as Category)));
     });
-    const unsubItems = onSnapshot(query(collection(db, 'items'), orderBy('name')), snap => {
+    const unsubItems = onSnapshot(query(collection(db, 'menu_items'), orderBy('name')), snap => {
       setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as Item)));
     });
     const unsubMods = onSnapshot(query(collection(db, 'modifier_groups'), orderBy('name')), snap => {
@@ -223,3 +223,5 @@ export default function MenuBuilderPage() {
     </div>
   );
 }
+
+    

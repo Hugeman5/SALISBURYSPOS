@@ -46,7 +46,7 @@ export function ProductGrid({ products, onAddToCart, loading }: ProductGridProps
               <CardTitle className="text-base leading-tight">{product.name}</CardTitle>
             </CardHeader>
             <CardFooter className="p-4 pt-0 flex justify-between items-center mt-auto">
-              <span className="font-semibold">{fmtZAR(product.price.incCents)}</span>
+              <span className="font-semibold">{fmtZAR(product.priceCents)}</span>
               {product.trackStock && (product.stockOnHand ?? 0) <= 0 && (
                   <Badge variant="destructive" className="absolute top-2 right-2">Out</Badge>
               )}
@@ -60,3 +60,5 @@ export function ProductGrid({ products, onAddToCart, loading }: ProductGridProps
     </ScrollArea>
   );
 }
+
+    
