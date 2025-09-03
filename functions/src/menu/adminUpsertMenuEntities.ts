@@ -42,7 +42,7 @@ export const adminUpsertMenuEntities = onCall(async (req) => {
             active: data.active ?? true,
         });
     case 'item':
-      return upsert('items', {
+      return upsert('menu_items', {
         name: data.name,
         sku: data.sku || null,
         plu: data.plu || null,
