@@ -2,13 +2,15 @@
   "name": "salisburys-pos",
   "version": "0.1.0",
   "private": true,
+  "main": "functions/lib/index.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start -p 3111",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "seed": "node scripts/seed.cjs"
+    "seed": "node scripts/seed.cjs",
+    "build:functions": "tsc -p functions/tsconfig.json"
   },
   "dependencies": {
     "@dataconnect/generated": "file:dataconnect-generated/js/example-connector",

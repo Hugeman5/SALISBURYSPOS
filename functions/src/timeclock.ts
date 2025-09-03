@@ -2,9 +2,11 @@
  * @fileoverview Cloud Functions for employee time clock management.
  */
 
-import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
+import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import {Timestamp} from "firebase-admin/firestore";
-import {db, requireRole, Role, STAFF_ROLES} from "./utils";
+import {db, requireRole, Role, STAFF_ROLES} from "./utils.js";
+
+type Req<T = any> = CallableRequest<T>;
 
 /**
  * Generates a 'YYYY-MM-DD' key for a given millisecond timestamp in the
@@ -42,7 +44,7 @@ async function getLatestOpen(uid: string) {
  * Clocks a user in, creating a new session document.
  * It's idempotent; if the user is already clocked in, it returns success.
  */
-export const clockIn = async (req: CallableRequest) => {
+export const clockIn = onCall({ cors: true }, async (req: Req) => {
   const role: Role = requireRole(req, STAFF_ROLES);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
@@ -70,13 +72,13 @@ export const clockIn = async (req: CallableRequest) => {
   });
 
   return {ok: true, punchId: docRef.id};
-};
+});
 
 /**
  * Clocks a user out, updating their latest open session with an end time
  * and calculated duration and cost.
  */
-export const clockOut = async (req: CallableRequest) => {
+export const clockOut = onCall({ cors: true }, async (req: Req) => {
   requireRole(req, STAFF_ROLES);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
@@ -98,14 +100,14 @@ export const clockOut = async (req: CallableRequest) => {
   });
 
   return {ok: true, punchId: open.id, durationSec, costCents};
-};
+});
 
 /**
  * Exports time clock sessions within a date range to a CSV string.
  */
-export const adminExportTimeCsv = async (req: CallableRequest) => {
+export const adminExportTimeCsv = onCall({ cors: true }, async (req: Req<{startMs: number, endMs: number}>) => {
   requireRole(req, ["admin", "manager"]);
-  const {startMs, endMs} = req.data as {startMs: number, endMs: number};
+  const {startMs, endMs} = req.data;
   if (!startMs || !endMs || endMs <= startMs) {
     const msg = "Valid startMs and endMs are required.";
     throw new HttpsError("invalid-argument", msg);
@@ -123,7 +125,7 @@ export const adminExportTimeCsv = async (req: CallableRequest) => {
   const rows: Row[] = [];
   const byUser: Record<string, { totalSecs: number; totalCost: number; }> = {};
 
-  snap.forEach((doc) => {
+  snap.forEach((doc: any) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const s = doc.data() as any;
     const inMs = (s.inAt as Timestamp).toMillis();
@@ -157,4 +159,4 @@ export const adminExportTimeCsv = async (req: CallableRequest) => {
     "# SUMMARY", sumHeader.join(","), ...sum].join("\n");
   const fname = `time_${saDayKey(startMs)}_${saDayKey(endMs - 1)}.csv`;
   return {ok: true, filename: fname, csv};
-};
+});

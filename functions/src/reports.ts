@@ -2,10 +2,11 @@
  * @fileoverview Cloud Functions for generating daily sales reports (Z-Reports).
  */
 
-import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
-import * as admin from "firebase-admin";
+import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import {Timestamp} from "firebase-admin/firestore";
-import {db, requireRole} from "./utils";
+import {db, requireRole, FieldValue} from "./utils.js";
+
+type Req<T = any> = CallableRequest<T>;
 
 interface OrderPayment {
     type: string;
@@ -64,7 +65,7 @@ function saDayWindow(dateStr?: string) {
  * This is idempotent; running it multiple times for the same day will
  * overwrite the previous report with updated data.
  */
-export const adminCloseDay = async (req: CallableRequest) => {
+export const adminCloseDay = onCall({ cors: true }, async (req: Req<{date?: string, startMs?: number, endMs?: number}>) => {
   requireRole(req, ["admin", "manager"]);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
@@ -84,7 +85,7 @@ export const adminCloseDay = async (req: CallableRequest) => {
     other: 0, discounts: 0, returns: 0, sampleSize: snap.size,
   };
 
-  snap.forEach((doc) => {
+  snap.forEach((doc: any) => {
     const d = doc.data() as OrderData;
     if (d.status !== "paid") return;
     const gross = Number(d.totals?.totalInc || 0);
@@ -112,18 +113,18 @@ export const adminCloseDay = async (req: CallableRequest) => {
 
   await db.collection("z_closures").doc(window.key).set({
     key: window.key, range: {startMs, endMs}, totals, vatRate: 0.15,
-    currency: "ZAR", closedAt: admin.firestore.FieldValue.serverTimestamp(),
+    currency: "ZAR", closedAt: FieldValue.serverTimestamp(),
     closedByUid: uid,
   }, {merge: true});
 
   return {ok: true, key: window.key, totals};
-};
+});
 
 
 /**
  * Exports a previously generated Z-Report to a CSV string.
  */
-export const adminExportZCsv = async (req: CallableRequest) => {
+export const adminExportZCsv = onCall({ cors: true }, async (req: Req<{date: string}>) => {
   requireRole(req, ["admin", "manager"]);
   const {date} = req.data;
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -148,4 +149,4 @@ export const adminExportZCsv = async (req: CallableRequest) => {
 
   const csv = [header.join(","), row.join(",")].join("\n");
   return {ok: true, filename: `z_${date}.csv`, csv};
-};
+});

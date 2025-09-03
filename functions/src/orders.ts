@@ -2,10 +2,11 @@
  * @fileoverview Cloud Functions for order management and processing.
  */
 
-import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
-import * as admin from "firebase-admin";
+import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import {z} from "zod";
-import {db, requireRole} from "./utils";
+import {db, requireRole, FieldValue, FieldPath} from "./utils.js";
+
+type Req<T = any> = CallableRequest<T>;
 
 const VAT_RATE = 0.15;
 
@@ -63,7 +64,7 @@ async function getProductsByIds(ids: string[]) {
   }
   const results = await Promise.all(
     chunks.map((c) => db.collection("products")
-      .where(admin.firestore.FieldPath.documentId(), "in", c).get())
+      .where(FieldPath.documentId(), "in", c).get())
   );
   const out = new Map<string, FirebaseFirestore.DocumentData>();
   for (const snap of results) {
@@ -73,7 +74,7 @@ async function getProductsByIds(ids: string[]) {
 }
 
 /** Creates a new order with a status of "open". */
-export const cashierCreateOrder = async (req: CallableRequest) => {
+export const cashierCreateOrder = onCall({ cors: true }, async (req: Req<{note?: string}>) => {
   requireRole(req, ["admin", "manager", "cashier"]);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
@@ -87,14 +88,14 @@ export const cashierCreateOrder = async (req: CallableRequest) => {
   await orderRef.set({
     status: "open", createdBy: actor.uid, cashierName: actor.name, items: [],
     totals: {subTotalEx: 0, vat: 0, totalInc: 0}, payments: [],
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
     currency: "ZAR", vatRate: VAT_RATE, note: note ?? null,
   });
   return {ok: true, orderId: orderRef.id};
-};
+});
 
 /** Sets or replaces the items in an order, recalculating totals. */
-export const cashierSetItems = async (req: CallableRequest) => {
+export const cashierSetItems = onCall({ cors: true }, async (req: Req<{orderId: string, items: {productId: string, qty: number}[]}>) => {
   requireRole(req, ["admin", "manager", "cashier"]);
   const {orderId, items: cartItems} = setItemsSchema.parse(req.data);
   const productIds = [...new Set(cartItems.map((i) => i.productId))];
@@ -124,25 +125,25 @@ export const cashierSetItems = async (req: CallableRequest) => {
 
   await db.collection("orders").doc(orderId).update({
     items: orderItems, totals: {subTotalEx: subEx, vat, totalInc: inc},
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   });
   return {ok: true, totals: {subTotalEx: subEx, vat, totalInc: inc}};
-};
+});
 
 /** Adds a payment record to an order. */
-export const cashierTakePayment = async (req: CallableRequest) => {
+export const cashierTakePayment = onCall({ cors: true }, async (req: Req<{orderId: string, type: "cash" | "card", amount: number}>) => {
   requireRole(req, ["admin", "manager", "cashier"]);
   const {orderId, type, amount} = takePaymentSchema.parse(req.data);
   const payment = {
-    type, amount, ts: admin.firestore.FieldValue.serverTimestamp(),
+    type, amount, ts: FieldValue.serverTimestamp(),
   };
   await db.collection("orders").doc(orderId)
-    .update({payments: admin.firestore.FieldValue.arrayUnion(payment)});
+    .update({payments: FieldValue.arrayUnion(payment)});
   return {ok: true};
-};
+});
 
 /** Closes an order, validates payment, and creates inventory movements. */
-export const cashierCloseOrder = async (req: CallableRequest) => {
+export const cashierCloseOrder = onCall({ cors: true }, async (req: Req<{orderId: string}>) => {
   requireRole(req, ["admin", "manager", "cashier"]);
   const {orderId} = closeOrderSchema.parse(req.data);
   const uid = req.auth?.uid;
@@ -152,7 +153,7 @@ export const cashierCloseOrder = async (req: CallableRequest) => {
   const orderRef = db.collection("orders").doc(orderId);
   const ledgerCol = db.collection("inventory_ledger");
 
-  await db.runTransaction(async (tx) => {
+  await db.runTransaction(async (tx: any) => {
     const orderSnap = await tx.get(orderRef);
     if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found");
     const order = orderSnap.data() || {};
@@ -161,13 +162,13 @@ export const cashierCloseOrder = async (req: CallableRequest) => {
     const items = Array.isArray(order.items) ? order.items : [];
     const payments = Array.isArray(order.payments) ? order.payments : [];
     const totals = order.totals || {totalInc: 0};
-    const totalPaid = payments.reduce((s, p) => s + Number(p?.amount || 0), 0);
+    const totalPaid = payments.reduce((s: any, p: any) => s + Number(p?.amount || 0), 0);
     if (totalPaid < Number(totals.totalInc || 0)) {
       throw new HttpsError("failed-precondition", "Insufficient payment");
     }
 
     // Handle inventory update
-    const productIds = items.map((item) => item.productId);
+    const productIds = items.map((item: any) => item.productId);
     const productsById = await getProductsByIds(productIds);
 
     for (const item of items) {
@@ -185,22 +186,22 @@ export const cashierCloseOrder = async (req: CallableRequest) => {
         before, after, note: `Order ${orderId}`,
         clientTxnId: `sale:${orderId}:${item.productId}`, userId: uid,
         userName: actorName,
-        ts: admin.firestore.FieldValue.serverTimestamp(),
+        ts: FieldValue.serverTimestamp(),
       });
       tx.update(db.collection("products").doc(item.productId), {
         stockOnHand: after,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
     }
 
     const orderUpdate: {[key: string]: unknown} = {
       status: "paid",
-      closedAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      closedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     };
 
     // If cash was used, update the register session and link it to the order
-    const cashPayments = payments.filter((p) => p.type === "cash");
+    const cashPayments = payments.filter((p: any) => p.type === "cash");
     if (cashPayments.length > 0) {
       const openSessionSnap = await db.collection("register_sessions")
         .where("status", "==", "open").limit(1).get();
@@ -214,13 +215,13 @@ export const cashierCloseOrder = async (req: CallableRequest) => {
       const openDoc = openSessionSnap.docs[0];
       orderUpdate.registerSessionId = openDoc.id;
 
-      const cashPaid = cashPayments.reduce((sum, p) => sum + p.amount, 0);
+      const cashPaid = cashPayments.reduce((sum: any, p: any) => sum + p.amount, 0);
       const changeGiven = Math.max(0, totalPaid - totals.totalInc);
       const cashDelta = cashPaid - changeGiven;
 
       if (cashDelta !== 0) {
         tx.update(openDoc.ref, {
-          expectedCash: admin.firestore.FieldValue.increment(cashDelta),
+          expectedCash: FieldValue.increment(cashDelta),
         });
       }
     }
@@ -228,10 +229,15 @@ export const cashierCloseOrder = async (req: CallableRequest) => {
     tx.update(orderRef, orderUpdate);
   });
   return {ok: true};
-};
+});
 
 /** Processes an itemized refund for a paid order. */
-export const cashierRefundItems = async (req: CallableRequest) => {
+export const cashierRefundItems = onCall({ cors: true }, async (req: Req<{
+  originalOrderId: string, 
+  items: {productId: string, qty: number, priceInc: number, name: string}[], 
+  method: "cash" | "card", 
+  reason?: string
+}>) => {
   requireRole(req, ["admin", "manager", "cashier"]);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
@@ -249,7 +255,7 @@ export const cashierRefundItems = async (req: CallableRequest) => {
   const orderRef = db.collection("orders").doc(originalOrderId);
   const refundRef = orderRef.collection("refunds").doc();
 
-  await db.runTransaction(async (tx) => {
+  await db.runTransaction(async (tx: any) => {
     const orderSnap = await tx.get(orderRef);
     if (!orderSnap.exists) {
       throw new HttpsError("not-found", "Original order not found.");
@@ -285,7 +291,7 @@ export const cashierRefundItems = async (req: CallableRequest) => {
           note: `Refund for order ${originalOrderId}`,
           userId: actor.uid,
           userName: actor.name,
-          ts: admin.firestore.FieldValue.serverTimestamp(),
+          ts: FieldValue.serverTimestamp(),
           clientTxnId: `refund:${refundRef.id}:${item.productId}`,
         });
         tx.update(productRef, {stockOnHand: after});
@@ -308,10 +314,10 @@ export const cashierRefundItems = async (req: CallableRequest) => {
       const delta = -totalRefundAmount;
 
       tx.update(sessionRef, {
-        expectedCash: admin.firestore.FieldValue.increment(delta),
+        expectedCash: FieldValue.increment(delta),
       });
       tx.set(movementRef, {
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
         by: actor,
         type: "payout",
         amount: delta,
@@ -321,7 +327,7 @@ export const cashierRefundItems = async (req: CallableRequest) => {
 
     // Create the refund document
     tx.set(refundRef, {
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
       createdBy: actor,
       originalOrderId,
       items,
@@ -336,4 +342,4 @@ export const cashierRefundItems = async (req: CallableRequest) => {
     refundId: refundRef.id,
     totalInc: totalRefundAmount,
   };
-};
+});

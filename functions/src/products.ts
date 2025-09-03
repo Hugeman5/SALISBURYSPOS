@@ -2,9 +2,10 @@
  * @fileoverview Cloud Functions for product and category management.
  */
 
-import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
-import * as admin from "firebase-admin";
-import {db, requireRole} from "./utils";
+import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
+import {db, requireRole, FieldValue} from "./utils.js";
+
+type Req<T = any> = CallableRequest<T>;
 
 /**
  * Helper to normalize money strings (e.g., "123.45") into integer cents.
@@ -102,7 +103,7 @@ async function upsertProductCore(input: UpsertInput) {
 
   const conflicts = await db.collection("products")
     .where("skuUpper", "==", skuUpper).get();
-  if (!conflicts.empty && conflicts.docs.some((d) => d.id !== id)) {
+  if (!conflicts.empty && conflicts.docs.some((d: any) => d.id !== id)) {
     throw new HttpsError("already-exists", `SKU already exists: ${skuUpper}`);
   }
 
@@ -111,7 +112,7 @@ async function upsertProductCore(input: UpsertInput) {
     sku: sku.trim(), skuUpper, barcode: barcode ? String(barcode) : null,
     categoryId, categoryName: catName, trackStock: !!trackStock,
     price: {currency: "ZAR", taxRate, incCents, exCents}, costIncCents,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   };
 
   const productId = id || db.collection("products").doc().id;
@@ -119,7 +120,7 @@ async function upsertProductCore(input: UpsertInput) {
   const doc = await productRef.get();
   if (!doc.exists) {
     await productRef.set({
-      ...data, createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      ...data, createdAt: FieldValue.serverTimestamp(),
     });
   } else {
     await productRef.update(data);
@@ -128,22 +129,22 @@ async function upsertProductCore(input: UpsertInput) {
 }
 
 /** Callable to upsert a single product. */
-export const adminUpsertProduct = async (req: CallableRequest) => {
+export const adminUpsertProduct = onCall({ cors: true }, async (req: Req<UpsertInput>) => {
   requireRole(req, ["admin", "manager"]);
   return upsertProductCore(req.data);
-};
+});
 
 /** Callable to delete a single product. */
-export const adminDeleteProduct = async (req: CallableRequest) => {
+export const adminDeleteProduct = onCall({ cors: true }, async (req: Req<{id: string}>) => {
   requireRole(req, ["admin"]);
   const {id} = req.data;
   if (!id) throw new HttpsError("invalid-argument", "Product ID is required.");
   await db.collection("products").doc(id).delete();
   return {ok: true};
-};
+});
 
 /** Callable to export all products to a CSV string. */
-export const adminExportProducts = async (req: CallableRequest) => {
+export const adminExportProducts = onCall({ cors: true }, async (req: Req) => {
   requireRole(req, ["admin", "manager"]);
   const snap = await db.collection("products").orderBy("nameLower").get();
   const rows: string[] = [
@@ -163,10 +164,10 @@ export const adminExportProducts = async (req: CallableRequest) => {
     ].join(","));
   }
   return {ok: true, csv: rows.join("\n")};
-};
+});
 
 /** Callable to bulk import products from a CSV string. */
-export const adminBulkImportProducts = async (req: CallableRequest) => {
+export const adminBulkImportProducts = onCall({ cors: true }, async (req: Req<{csv: string}>) => {
   requireRole(req, ["admin", "manager"]);
   const csv: string = req.data?.csv || "";
   if (!csv) throw new HttpsError("invalid-argument", "CSV data is required.");
@@ -202,4 +203,4 @@ export const adminBulkImportProducts = async (req: CallableRequest) => {
     imported++;
   }
   return {ok: true, imported};
-};
+});

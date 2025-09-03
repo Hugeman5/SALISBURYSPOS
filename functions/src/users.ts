@@ -2,12 +2,12 @@
  * @fileoverview User and authentication management functions.
  */
 
-import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
-import * as functions from "firebase-functions";
-import * as admin from "firebase-admin";
+import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
+import {auth, db, requireRole, FieldValue} from "./utils.js";
 import * as bcrypt from "bcryptjs";
 import {z} from "zod";
-import {db, requireRole} from "./utils";
+
+type Req<T = any> = CallableRequest<T>;
 
 const UpsertUserPayloadSchema = z.object({
   id: z.string().min(1),
@@ -23,7 +23,7 @@ const UpsertUserPayloadSchema = z.object({
  * @param {object} req The request object.
  * @return {Promise<{ok: true, id: string}>} A promise that resolves on success.
  */
-export const adminUpsertUser = async (req: CallableRequest) => {
+export const adminUpsertUser = onCall({ cors: true }, async (req: Req<z.infer<typeof UpsertUserPayloadSchema>>) => {
   const actorRole = requireRole(req, ["admin", "manager"]);
   const result = UpsertUserPayloadSchema.safeParse(req.data);
   if (!result.success) {
@@ -57,18 +57,18 @@ export const adminUpsertUser = async (req: CallableRequest) => {
     role: data.role,
     active: data.active,
     hourlyRateCents,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   };
 
   if (isNew) {
-    userData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    userData.createdAt = FieldValue.serverTimestamp();
     await userRef.set(userData);
   } else {
     await userRef.update(userData);
   }
 
   return {ok: true, id: userId};
-};
+});
 
 /**
  * A callable function for admins/managers to deactivate a user account.
@@ -76,12 +76,12 @@ export const adminUpsertUser = async (req: CallableRequest) => {
  * @param {object} req The request object.
  * @return {Promise<{ok: true, id: string}>} A promise that resolves on success.
  */
-export const adminDeleteUser = async (req: CallableRequest) => {
+export const adminDeleteUser = onCall({ cors: true }, async (req: Req<{id: string}>) => {
   requireRole(req, ["admin", "manager"]);
   const {id} = z.object({id: z.string().min(1)}).parse(req.data);
   await db.collection("users").doc(id).update({active: false});
   return {ok: true, id};
-};
+});
 
 const SetPinPayloadSchema = z.object({
   id: z.string().min(1),
@@ -93,7 +93,7 @@ const SetPinPayloadSchema = z.object({
  * @param {object} req The request object.
  * @return {Promise<{ok: true}>} A promise that resolves on success.
  */
-export const adminSetUserPin = async (req: CallableRequest) => {
+export const adminSetUserPin = onCall({ cors: true }, async (req: Req<z.infer<typeof SetPinPayloadSchema>>) => {
   requireRole(req, ["admin", "manager"]);
   const {id, pin} = SetPinPayloadSchema.parse(req.data);
 
@@ -105,13 +105,12 @@ export const adminSetUserPin = async (req: CallableRequest) => {
 
   // Ensure user exists in Firebase Auth, creating if necessary.
   try {
-    await admin.auth().getUser(id);
+    await auth.getUser(id);
   } catch (error: unknown) {
     const firebaseError = error as {code?: string; message?: string};
     if (firebaseError.code === "auth/user-not-found") {
-      functions.logger.info(`Creating new Firebase Auth user for ${id}`);
       const userData = userDoc.data();
-      await admin.auth().createUser({
+      await auth.createUser({
         uid: id,
         displayName: userData?.name || id,
       });
@@ -129,10 +128,10 @@ export const adminSetUserPin = async (req: CallableRequest) => {
     .set(
       {
         pinHash,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       },
       {merge: true}
     );
 
   return {ok: true};
-};
+});

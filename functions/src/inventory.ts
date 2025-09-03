@@ -1,10 +1,11 @@
 /**
  * @fileoverview Cloud Functions for inventory and stock management.
  */
-import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
-import * as admin from "firebase-admin";
+import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import {format} from "date-fns";
-import {db, requireRole} from "./utils";
+import {db, requireRole, FieldValue} from "./utils.js";
+
+type Req<T = any> = CallableRequest<T>;
 
 /** Defines the types of stock movements allowed in the ledger. */
 type MovementType = "receive" | "sale" | "refund" | "wastage" |
@@ -14,7 +15,14 @@ type MovementType = "receive" | "sale" | "refund" | "wastage" |
  * Posts a stock movement to the inventory ledger and updates the product's
  * stock-on-hand count in a single transaction. Supports idempotency.
  */
-export const adminPostStockMovement = async (req: CallableRequest) => {
+export const adminPostStockMovement = onCall({ cors: true }, async (req: Req<{
+  productId: string, 
+  type: MovementType, 
+  qty: number, 
+  clientTxnId?: string, 
+  adjustSign?: number, 
+  note?: string
+}>) => {
   requireRole(req, ["admin", "manager"]);
   const uid = req.auth?.uid;
   if (!uid) {
@@ -55,7 +63,7 @@ export const adminPostStockMovement = async (req: CallableRequest) => {
   const ledgerRef = db.collection("inventory_ledger").doc();
 
   // --- Transaction ---
-  const {before, after, delta} = await db.runTransaction(async (tx) => {
+  const {before, after, delta} = await db.runTransaction(async (tx: any) => {
     const snap = await tx.get(productRef);
     if (!snap.exists) throw new HttpsError("not-found", "Product not found.");
     const product = snap.data() || {};
@@ -84,23 +92,28 @@ export const adminPostStockMovement = async (req: CallableRequest) => {
       productId: data.productId, productName: product.name || "",
       productSku: product.sku || "", type: data.type, qty, delta,
       before, after, note: data.note || null, userId: uid, userName: actorName,
-      ts: admin.firestore.FieldValue.serverTimestamp(),
+      ts: FieldValue.serverTimestamp(),
       clientTxnId: data.clientTxnId,
     });
     tx.update(productRef, {
       stockOnHand: after,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
     return {before, after, delta};
   });
 
   return {ok: true, before, after, delta, ledgerId: ledgerRef.id};
-};
+});
 
 /**
  * Exports the inventory ledger to a CSV file, with optional filters.
  */
-export const adminExportLedger = async (req: CallableRequest) => {
+export const adminExportLedger = onCall({ cors: true }, async (req: Req<{ 
+  productId?: string, 
+  type?: MovementType, 
+  fromTs?: string, 
+  toTs?: string 
+}>) => {
   requireRole(req, ["admin", "manager"]);
   const data = req.data;
   const {productId, type, fromTs, toTs} = data;
@@ -141,4 +154,4 @@ export const adminExportLedger = async (req: CallableRequest) => {
     filename: `inventory-ledger-${format(new Date(), "yyyyMMdd-HHmm")}.csv`,
     mime: "text/csv", dataBase64,
   };
-};
+});

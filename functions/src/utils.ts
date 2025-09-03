@@ -1,13 +1,18 @@
 /**
  * @fileoverview Shared utilities for Firebase Functions.
- * @author Your Name
  */
 
-import * as admin from "firebase-admin";
-import {HttpsError, type CallableRequest} from "firebase-functions/v2/https";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore, FieldValue, Timestamp, FieldPath } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
+import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 
-/** The Firestore database instance. */
-export const db = admin.firestore();
+export const db = getFirestore();
+export const auth = getAuth();
+export const storage = getStorage();
+
+// Re-export common helpers so callers stop reaching into admin.firestore.*
+export { FieldValue, Timestamp, FieldPath };
 
 /** Defines the set of user roles in the application. */
 export type Role = "admin" | "manager" | "cashier" | "waiter" | "kitchen";

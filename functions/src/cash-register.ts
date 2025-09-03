@@ -2,15 +2,16 @@
  * @fileoverview Cloud Functions for cash register session management.
  */
 
-import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
-import * as admin from "firebase-admin";
-import { db, requireRole } from "./utils";
+import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
+import { db, FieldValue, requireRole } from "./utils.js";
+
+type Req<T = any> = CallableRequest<T>;
 
 /**
  * Manages cash register sessions (opening and closing).
  * This function is dispatched based on the 'action' property in the payload.
  */
-export const manageRegisterSession = async (req: CallableRequest) => {
+export const manageRegisterSession = onCall({ cors: true }, async (req: Req<{action: string, registerId: string, openingFloat: number, sessionId: string, countedCash: number}>) => {
   requireRole(req, ["admin", "manager"]);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
@@ -38,7 +39,7 @@ export const manageRegisterSession = async (req: CallableRequest) => {
     const newSessionRef = db.collection("register_sessions").doc();
     await newSessionRef.set({
       registerId, status: "open",
-      openedAt: admin.firestore.FieldValue.serverTimestamp(),
+      openedAt: FieldValue.serverTimestamp(),
       openedBy: {uid, name: actorName},
       openingFloat, expectedCash: openingFloat,
     });
@@ -65,7 +66,7 @@ export const manageRegisterSession = async (req: CallableRequest) => {
     const overShort = countedCash - expectedCash;
     await sessionRef.update({
       status: "closed",
-      closedAt: admin.firestore.FieldValue.serverTimestamp(),
+      closedAt: FieldValue.serverTimestamp(),
       closedBy: {uid, name: actorName},
       countedCash, overShort,
     });
@@ -73,13 +74,13 @@ export const manageRegisterSession = async (req: CallableRequest) => {
   }
 
   throw new HttpsError("invalid-argument", "Invalid action specified.");
-};
+});
 
 /**
  * Records a cash movement (pay-in or pay-out) for an open session.
  * This function transactionally updates the session's expected cash total.
  */
-export const postCashMovement = async (req: CallableRequest) => {
+export const postCashMovement = onCall({ cors: true }, async (req: Req<{sessionId: string, type: string, amount: number, reason: string}>) => {
   requireRole(req, ["admin", "manager"]);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
@@ -101,7 +102,7 @@ export const postCashMovement = async (req: CallableRequest) => {
   const movementRef = sessionRef.collection("cash_movements").doc();
   const delta = type === "payin" ? amount : -amount;
 
-  await db.runTransaction(async (tx) => {
+  await db.runTransaction(async (tx: any) => {
     const s = await tx.get(sessionRef);
     if (!s.exists) throw new HttpsError("not-found", "Session not found.");
     const session = s.data() || {};
@@ -111,10 +112,10 @@ export const postCashMovement = async (req: CallableRequest) => {
     const newExpected = (Number(session.expectedCash) || 0) + delta;
     tx.update(sessionRef, {expectedCash: newExpected});
     tx.set(movementRef, {
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
       by: {uid, name: actorName}, type, amount: delta, reason,
     });
   });
 
   return {ok: true};
-};
+});
