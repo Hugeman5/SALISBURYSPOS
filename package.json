@@ -63,6 +63,7 @@
     "zustand": "^4.5.4"
   },
   "devDependencies": {
+    "@next/eslint-plugin-next": "^15.5.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.14.12",
     "@types/react": "^18.3.3",

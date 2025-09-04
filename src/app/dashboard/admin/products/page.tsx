@@ -115,9 +115,9 @@ export default function ProductsPage(){
             editing
               ? {
                   ...editing,
-                  priceCents: editing.priceCents ?? undefined,
+                  priceCents: editing.price?.incCents ?? undefined,
                   costIncCents: editing.costIncCents ?? undefined,
-                  vatRate: editing.vatRate ?? undefined,
+                  vatRate: editing.price?.taxRate ?? undefined,
                 }
               : null
           }
