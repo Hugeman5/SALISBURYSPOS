@@ -11,9 +11,10 @@ import {
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/stores/auth-store';
 import { RoleGate } from '@/components/auth-gate';
-import type { Product, Category } from '@/types';
+import type { Category } from '@/types';
+import { POSProduct } from '@/types/catalog';
 import { useCartStore } from '@/stores/cart-store';
-import { ProductGrid } from '@/components/pos/ProductGrid';
+import ProductGrid from '@/components/pos/ProductGrid';
 import { CartPanel } from '@/components/pos/CartPanel';
 import { Input } from '@/components/ui/input';
 import { Search, ChevronLeft } from 'lucide-react';
@@ -25,7 +26,7 @@ import { useDebounce } from '@/hooks/use-debounce';
 export default function SalePage() {
   const profile = useAuth((s) => s.profile);
   const { addToCart } = useCartStore();
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<POSProduct[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -54,7 +55,7 @@ export default function SalePage() {
 
     const unsubProducts = onSnapshot(prodQuery, (prodSnap) => {
       const productsData = prodSnap.docs.map(
-        (doc) => ({ id: doc.id, ...doc.data() } as Product)
+        (doc) => ({ id: doc.id, ...doc.data() } as POSProduct)
       );
       setProducts(productsData);
       setLoading(false);
@@ -70,7 +71,7 @@ export default function SalePage() {
     let filtered = products;
 
     if (activeCategoryId && activeCategoryId !== 'all') {
-      filtered = filtered.filter((p) => p.categoryId === activeCategoryId);
+      filtered = filtered.filter((p) => (p as any).categoryId === activeCategoryId);
     }
 
     if (debouncedSearchTerm) {
@@ -129,7 +130,7 @@ export default function SalePage() {
           <main className="flex-grow overflow-hidden">
             <ProductGrid
               products={filteredProducts}
-              onAddToCart={addToCart}
+              onProductClick={addToCart}
               loading={loading}
             />
           </main>

@@ -8,16 +8,9 @@ import {
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import ProductFormDrawer from '@/components/admin/products/ProductFormDrawer';
-
-export type Product = {
-  id?: string;
-  name: string;
-  sku?: string; plu?: string; barcode?: string;
-  categoryId?: string;
-  priceCents: number; costCents?: number; vatRate?: number; unit?: string;
-  active: boolean;
-  createdAt?: any; updatedAt?: any;
-};
+import { Product } from '@/types';
+import { fmtZAR } from '@/lib/utils';
+import { getPriceCents } from '@/lib/utils';
 
 export default function ProductsPage(){
   const db = getFirestore(app);
@@ -41,7 +34,7 @@ export default function ProductsPage(){
   const filtered = useMemo(()=>{
     const q=qTxt.trim().toLowerCase();
     if(!q) return items;
-    return items.filter(i => (i.name||'').toLowerCase().includes(q) || (i.sku||'').toLowerCase().includes(q) || (i.plu||'').toLowerCase().includes(q));
+    return items.filter(i => (i.name||'').toLowerCase().includes(q) || (i.sku||'').toLowerCase().includes(q) || ((i as any).plu||'').toLowerCase().includes(q));
   },[items,qTxt]);
 
   async function toggleActive(p:Product){
@@ -64,7 +57,7 @@ export default function ProductsPage(){
     const a = document.createElement('a'); a.href=url; a.download=r.data.filename||'products.csv'; a.click();
   }
 
-  function openNew(){ setEditing({ name:'', priceCents:0, active:true }); setShowDrawer(true); }
+  function openNew(){ setEditing({ name:'', active:true } as Product); setShowDrawer(true); }
   function openEdit(p:Product){ setEditing(p); setShowDrawer(true); }
 
   return (
@@ -102,9 +95,9 @@ export default function ProductsPage(){
               <tr key={p.id} className="hover:bg-neutral-50">
                 <td className="p-2 font-medium">{p.name}</td>
                 <td className="p-2">{p.sku||''}</td>
-                <td className="p-2">{p.plu||''}</td>
-                <td className="p-2 text-right">{new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR'}).format((p.priceCents||0)/100)}</td>
-                <td className="p-2 text-right">{p.costCents? new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR'}).format(p.costCents/100): '-'}</td>
+                <td className="p-2">{(p as any).plu||''}</td>
+                <td className="p-2 text-right">{fmtZAR(getPriceCents(p))}</td>
+                <td className="p-2 text-right">{p.costIncCents? new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR'}).format(p.costIncCents/100): '-'}</td>
                 <td className="p-2">{p.categoryId||'-'}</td>
                 <td className="p-2 text-center">
                   <button onClick={()=>toggleActive(p)} className={`px-2 py-1 rounded border ${p.active? 'bg-emerald-600 text-white':'bg-white'}`}>{p.active?'On':'Off'}</button>
@@ -118,7 +111,16 @@ export default function ProductsPage(){
 
       {showDrawer && (
         <ProductFormDrawer
-          product={editing}
+          product={
+            editing
+              ? {
+                  ...editing,
+                  priceCents: editing.priceCents ?? undefined,
+                  costIncCents: editing.costIncCents ?? undefined,
+                  vatRate: editing.vatRate ?? undefined,
+                }
+              : null
+          }
           onClose={()=>setShowDrawer(false)}
           onSaved={()=>setShowDrawer(false)}
         />

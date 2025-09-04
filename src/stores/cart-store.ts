@@ -2,10 +2,38 @@
 'use client';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Product } from '@/types';
+import { POSProduct } from '@/types/catalog';
 import type { CartLineItem } from '@/types/pos';
 import { toast } from '@/hooks/use-toast';
 import { splitVat } from '@/utils/money';
+
+// Helper to get the price of a product, preferring effPriceCents over priceCents
+const getPriceCents = (p: POSProduct): number => {
+  return p.effPriceCents ?? p.priceCents ?? 0;
+};
+
+type Stocky = Pick<CartLineItem, 'stockOnHand' | 'trackStock'>;
+
+function availableQty(x: Stocky): number {
+  // If not tracking stock, or no numeric value → unlimited
+  if (!x.trackStock) return Number.POSITIVE_INFINITY;
+  return (typeof x.stockOnHand === 'number') ? x.stockOnHand : Number.POSITIVE_INFINITY;
+}
+
+function toCartLineItem(product: POSProduct): CartLineItem {
+  return {
+    productId: product.id,
+    name: product.name,
+    qty: 1,
+    priceInclCents: getPriceCents(product),
+    vatRate: 0.15, // Assuming a standard VAT rate
+    // IMPORTANT: normalize null → undefined so the cart type is consistent
+    stockOnHand: (typeof product.stockOnHand === 'number')
+      ? product.stockOnHand
+      : undefined,
+    trackStock: !!product.trackStock,
+  };
+}
 
 interface CartState {
   cart: CartLineItem[];
@@ -14,7 +42,7 @@ interface CartState {
     vat: number;
     totalInc: number;
   };
-  addToCart: (product: Product) => void;
+  addToCart: (product: POSProduct) => void;
   updateQuantity: (productId: string, delta: number) => void;
   removeFromCart: (productId: string) => void;
   clearCart: () => void;
@@ -36,7 +64,7 @@ export const useCartStore = create<CartState>()(
         const { cart } = get();
         const existingItem = cart.find((item) => item.productId === product.id);
 
-        let newCart;
+        let newCart: CartLineItem[];
         if (existingItem) {
           newCart = cart.map((item) =>
             item.productId === product.id ? { ...item, qty: item.qty + 1 } : item
@@ -44,20 +72,12 @@ export const useCartStore = create<CartState>()(
         } else {
           newCart = [
             ...cart,
-            {
-              productId: product.id,
-              name: product.name,
-              qty: 1,
-              priceInclCents: product.priceCents,
-              vatRate: product.taxRate || 0.15,
-              stockOnHand: product.stockOnHand,
-              trackStock: product.trackStock,
-            },
+            toCartLineItem(product)
           ];
         }
 
         const itemInNewCart = newCart.find(i => i.productId === product.id)!;
-        if (itemInNewCart.trackStock && itemInNewCart.stockOnHand !== undefined && itemInNewCart.qty > itemInNewCart.stockOnHand) {
+        if (itemInNewCart.qty > availableQty(itemInNewCart)) {
             toast({
               variant: "destructive",
               title: "Stock Limit Reached",
@@ -76,7 +96,7 @@ export const useCartStore = create<CartState>()(
         
         const newQty = itemToUpdate.qty + delta;
 
-        if(itemToUpdate.trackStock && itemToUpdate.stockOnHand !== undefined && newQty > itemToUpdate.stockOnHand) {
+        if(newQty > availableQty(itemToUpdate)) {
             toast({
                 variant: "destructive",
                 title: "Stock Limit Reached",
@@ -106,8 +126,8 @@ export const useCartStore = create<CartState>()(
       },
     }),
     {
-      name: 'pos-cart-storage', // name of the item in the storage (must be unique)
-      storage: createJSONStorage(() => localStorage), // (optional) by default, 'localStorage' is used
+      name: 'pos-cart-storage',
+      storage: createJSONStorage(() => localStorage),
     }
   )
 );

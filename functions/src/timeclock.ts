@@ -3,8 +3,10 @@
  */
 
 import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
+import { logger } from "firebase-functions";
 import {Timestamp} from "firebase-admin/firestore";
-import {db, requireRole, Role, STAFF_ROLES} from "./utils.js";
+import { db } from "./utils.js";
+import { requireRole, STAFF_ROLES, type StaffRole } from "./roles.js";
 
 type Req<T = any> = CallableRequest<T>;
 
@@ -44,10 +46,13 @@ async function getLatestOpen(uid: string) {
  * Clocks a user in, creating a new session document.
  * It's idempotent; if the user is already clocked in, it returns success.
  */
-export const clockIn = onCall({ cors: true }, async (req: Req) => {
-  const role: Role = requireRole(req, STAFF_ROLES);
+export const clockIn = onCall({ cors: true }, async (req: Req<{ pin: string }>) => {
+  const role: StaffRole = requireRole(req, STAFF_ROLES);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
+
+  const { pin } = req.data || {};
+  if (!pin) throw new HttpsError("invalid-argument", "pin is required");
 
   const now = Timestamp.now();
   const open = await getLatestOpen(uid);
@@ -71,6 +76,7 @@ export const clockIn = onCall({ cors: true }, async (req: Req) => {
     dateKey: saDayKey(now.toMillis()), createdAt: now, updatedAt: now,
   });
 
+  logger.info("clockIn", { role });
   return {ok: true, punchId: docRef.id};
 });
 
@@ -78,10 +84,13 @@ export const clockIn = onCall({ cors: true }, async (req: Req) => {
  * Clocks a user out, updating their latest open session with an end time
  * and calculated duration and cost.
  */
-export const clockOut = onCall({ cors: true }, async (req: Req) => {
-  requireRole(req, STAFF_ROLES);
+export const clockOut = onCall({ cors: true }, async (req: Req<{ pin: string }>) => {
+  const role: StaffRole = requireRole(req, STAFF_ROLES);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
+
+  const { pin } = req.data || {};
+  if (!pin) throw new HttpsError("invalid-argument", "pin is required");
 
   const open = await getLatestOpen(uid);
   if (!open) {
@@ -99,6 +108,7 @@ export const clockOut = onCall({ cors: true }, async (req: Req) => {
     outAt, durationSec, costCents, updatedAt: outAt,
   });
 
+  logger.info("clockOut", { role });
   return {ok: true, punchId: open.id, durationSec, costCents};
 });
 

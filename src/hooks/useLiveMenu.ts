@@ -1,11 +1,10 @@
+
 import { useEffect, useMemo, useState } from 'react';
-import { app } from '@/lib/firebaseClient';
+import { app } from '@/app/lib/firebaseClient';
 import {
   getFirestore, collection, onSnapshot, query, where, orderBy, DocumentData
 } from 'firebase/firestore';
 import type { Menu, MenuButton, MenuScreen, Item } from '@/types/menu-floor';
-import { effectivePrice } from '@/lib/priceEngine';
-import { isMenuAvailable } from '@/lib/availability';
 
 export type LiveMenuContext = {
   deviceId: string;
@@ -46,8 +45,8 @@ export function useLiveMenu(ctx: LiveMenuContext): LiveMenuData {
       }));
       unsubs.push(onSnapshot(collection(db, 'menu_availability'), s => setAvailability(s.docs.map(d => d.data()))));
       unsubs.push(onSnapshot(collection(db, 'price_rules'), s => setRules(s.docs.map(d => d.data()))));
-      unsubs.push(onSnapshot(query(collection(db, 'categories'), where('active', '==', true), orderBy('order', 'asc')), s => setCategories(s.docs.map(d => ({ id: d.id, ...(d.data() as DocumentData) }))));
-      unsubs.push(onSnapshot(query(collection(db, 'items'), where('active', '==', true)), s => setItems(s.docs.map(d => d.data() as Item))));
+      unsubs.push(onSnapshot(query(collection(db, 'categories'), where('active', '==', true), orderBy('order', 'asc')), s => setCategories(s.docs.map(d => ({ id: d.id, ...(d.data() as DocumentData) })))));
+      unsubs.push(onSnapshot(query(collection(db, 'items'), where('active', '==', true)), s => setItems(s.docs.map(d => d.data() as Item))))
     } catch (e: any) {
       setError(e?.message || String(e));
     }

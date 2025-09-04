@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
 import { useLiveMenu } from '@/hooks/useLiveMenu';
-import { app } from '@/lib/firebaseClient';
+import { app } from '@/app/lib/firebaseClient';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
 function fmtZAR(cents: number) { return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format((cents||0)/100); }

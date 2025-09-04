@@ -1,64 +1,74 @@
-
 'use client';
-import type { Product } from '@/types';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { fmtZAR } from '@/utils/money';
-import { ScrollArea } from '../ui/scroll-area';
 
-interface ProductGridProps {
-  products: Product[];
-  onAddToCart: (product: Product) => void;
-  loading: boolean;
+import { useMemo } from 'react';
+import { Card, CardHeader, CardFooter } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { POSProduct } from '@/types/catalog';
+
+function fmtZAR(cents: number) {
+  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' })
+    .format((cents || 0) / 100);
 }
 
-export function ProductGrid({ products, onAddToCart, loading }: ProductGridProps) {
+function getPriceCents(p: POSProduct): number {
+  if (typeof p.effPriceCents === 'number') return p.effPriceCents;
+  if (typeof p.priceCents === 'number') return p.priceCents;
+  return 0;
+}
+
+export default function ProductGrid({
+  products,
+  onProductClick,
+  loading = false,
+}: {
+  products: POSProduct[];
+  onProductClick: (p: POSProduct) => void;
+  loading?: boolean;
+}) {
+  const list = useMemo(() => products ?? [], [products]);
+
   if (loading) {
     return (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {Array.from({ length: 15 }).map((_, i) => (
-                <Card key={i} className="animate-pulse">
-                    <CardContent className="p-4">
-                        <div className="h-20 bg-muted rounded-md mb-2"></div>
-                        <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-                        <div className="h-4 bg-muted rounded w-1/2"></div>
-                    </CardContent>
-                </Card>
-            ))}
-        </div>
+      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-28 rounded border bg-neutral-50 animate-pulse" />
+        ))}
+      </div>
     );
-  }
-  
-  if (products.length === 0) {
-    return <div className="text-center text-muted-foreground py-10">No products found for this category or search term.</div>
   }
 
   return (
-    <ScrollArea className="h-full">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pr-4">
-        {products.map((product) => (
-          <Card
-            key={product.id}
-            onClick={() => onAddToCart(product)}
-            className="cursor-pointer hover:border-primary transition-colors flex flex-col relative"
-          >
-            <CardHeader className="p-4 flex-grow">
-              <CardTitle className="text-base leading-tight">{product.name}</CardTitle>
+    <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+      {list.map((product) => {
+        const price = getPriceCents(product);
+        const outOfStock =
+          !!product.trackStock && (product.stockOnHand ?? 0) <= 0;
+
+        return (
+          <Card key={product.id} className="relative h-28 flex flex-col border hover:shadow-sm">
+            {outOfStock && (
+              <Badge variant="destructive" className="absolute top-2 right-2">
+                Out
+              </Badge>
+            )}
+
+            <CardHeader className="p-3 pb-1">
+              <div className="text-xs text-slate-600">
+                {product.sku || product.plu || '\u00A0'}
+              </div>
+              <div className="font-semibold truncate">{product.name}</div>
             </CardHeader>
-            <CardFooter className="p-4 pt-0 flex justify-between items-center mt-auto">
-              <span className="font-semibold">{fmtZAR(product.priceCents)}</span>
-              {product.trackStock && (product.stockOnHand ?? 0) <= 0 && (
-                  <Badge variant="destructive" className="absolute top-2 right-2">Out</Badge>
-              )}
-               {product.trackStock && (product.stockOnHand ?? 0) > 0 && (product.stockOnHand ?? 0) <= 5 && (
-                  <Badge variant="secondary" className="absolute top-2 right-2">Low</Badge>
-              )}
+
+            <CardFooter className="p-3 pt-0 mt-auto flex justify-between items-center">
+              <span className="font-semibold">{fmtZAR(price)}</span>
+              <Button size="sm" variant="outline" onClick={() => onProductClick(product)}>
+                Add
+              </Button>
             </CardFooter>
           </Card>
-        ))}
-      </div>
-    </ScrollArea>
+        );
+      })}
+    </div>
   );
 }
-
-    

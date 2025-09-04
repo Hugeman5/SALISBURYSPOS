@@ -14,10 +14,10 @@ const schema = z.object({
   name: z.string().min(1,'Name is required'),
   sku: z.string().optional(),
   plu: z.string().optional(),
-  barcode: z.string().optional(),
-  categoryId: z.string().optional(),
-  priceCents: z.coerce.number().int().min(0),
-  costCents: z.coerce.number().int().min(0).optional(),
+  barcode: z.string().optional().nullable(),
+  categoryId: z.string().optional().nullable(),
+  priceCents: z.coerce.number().int().min(0).optional(),
+  costIncCents: z.coerce.number().int().min(0).optional(),
   vatRate: z.coerce.number().min(0).max(100).optional(),
   unit: z.string().optional(),
   active: z.boolean().default(true)
@@ -81,8 +81,8 @@ export default function ProductFormDrawer({ product, onClose, onSaved }:{ produc
             <label className="block text-sm">Price (cents)
               <input type="number" className="border rounded p-2 w-full" {...register('priceCents')} />
             </label>
-            <label className="block text-sm">Cost (cents)
-              <input type="number" className="border rounded p-2 w-full" {...register('costCents')} />
+            <label className="block text-sm">Cost (inc VAT, cents)
+              <input type="number" className="border rounded p-2 w-full" {...register('costIncCents')} />
             </label>
           </div>
           <div className="grid grid-cols-2 gap-2">

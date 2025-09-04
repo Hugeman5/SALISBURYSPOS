@@ -1,51 +1,51 @@
-/**
- * @fileoverview Shared utilities for Firebase Functions.
- */
-
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore, FieldValue, Timestamp, FieldPath } from "firebase-admin/firestore";
-import { getStorage } from "firebase-admin/storage";
+// Modular Admin SDK bootstrap (ESM-safe, no race conditions)
+import { getApps, initializeApp, App } from "firebase-admin/app";
+import {
+  getFirestore,
+  FieldValue,
+  Timestamp,
+  FieldPath,
+  Firestore,
+} from "firebase-admin/firestore";
+import { getAuth, Auth } from "firebase-admin/auth";
+import { getStorage, Storage } from "firebase-admin/storage";
 import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 
-export const db = getFirestore();
-export const auth = getAuth();
-export const storage = getStorage();
+// Create (or reuse) the default app synchronously and KEEP A HANDLE
+const app: App = getApps()[0] ?? initializeApp();
 
-// Re-export common helpers so callers stop reaching into admin.firestore.*
+// Always pass the app instance explicitly
+export const db: Firestore = getFirestore(app);
+export const auth: Auth = getAuth(app);
+export const storage: Storage = getStorage(app);
+
+// Re-export common helpers so other files never reach into admin.* directly
 export { FieldValue, Timestamp, FieldPath };
 
-/** Defines the set of user roles in the application. */
-export type Role = "admin" | "manager" | "cashier" | "waiter" | "kitchen";
 
 /**
- * Roles that are considered staff and can access POS/admin functionality.
+ * Asserts that the caller has one of the specified roles.
+ * @param {CallableRequest} req - The request object.
+ * @param {string[]} roles - The allowed roles.
+ * @throws {HttpsError} - If the user is not authenticated or does not have the required role.
+ * @returns {string} The role of the user.
  */
-export const STAFF_ROLES: Role[] = [
-  "admin",
-  "manager",
-  "cashier",
-  "waiter",
-  "kitchen",
-];
-
-/**
- * Enforces role-based access for a callable function. Throws an HttpsError
- * if the user is not authenticated or does not have one of the allowed roles.
- * @param {CallableRequest} req The function request context.
- * @param {Role[]} allowed An array of roles that are allowed to proceed.
- * @return {Role} The role of the authenticated user.
- * @throws {HttpsError} Throws "unauthenticated" or "permission-denied".
- */
-export function requireRole(req: CallableRequest, allowed: Role[]): Role {
-  if (!req.auth) {
+export function requireRole(req: CallableRequest, roles: string[]): Role {
+  const uid = req.auth?.uid;
+  if (!uid) {
     throw new HttpsError("unauthenticated", "Authentication is required.");
   }
-  const role = req.auth.token?.role as Role | undefined;
-  if (!role || !allowed.includes(role)) {
+  const role = req.auth?.token.role as Role;
+  if (!roles.includes(role)) {
     throw new HttpsError(
       "permission-denied",
-      "You do not have sufficient permissions to perform this action."
+      `You must have one of the following roles: ${roles.join(", ")}.`
     );
   }
   return role;
 }
+
+// Define roles
+export type Role = "admin" | "manager" | "staff";
+export const ALL_ROLES: Role[] = ["admin", "manager", "staff"];
+export const STAFF_ROLES: Role[] = ["admin", "manager", "staff"];
