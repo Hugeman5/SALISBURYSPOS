@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Sidebar,
@@ -22,6 +21,10 @@ import {
   Clock,
   Home,
   ShoppingCart,
+  Moon,
+  Sheet,
+  PenSquare,
+  Map,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { LogoutButton } from '@/components/auth/logout-button';
@@ -33,8 +36,11 @@ const menuItems = [
   { href: '/dashboard/admin', title: 'Dashboard', icon: Home, roles: ['admin', 'manager'] },
   { href: '/pos/sale', title: 'Point of Sale', icon: ShoppingCart, roles: ['admin', 'manager', 'cashier', 'waiter', 'kitchen'] },
   { href: '/dashboard/admin/orders', title: 'Orders', icon: Receipt, roles: ['admin', 'manager', 'cashier'] },
+  { href: '/dashboard/admin/menu', title: 'Menu Builder', icon: PenSquare, roles: ['admin', 'manager'] },
   { href: '/dashboard/admin/products', title: 'Products', icon: Package, roles: ['admin', 'manager'] },
   { href: '/dashboard/admin/inventory', title: 'Inventory', icon: LayoutGrid, roles: ['admin', 'manager'] },
+  { href: '/dashboard/admin/floor-builder', title: 'Floor Plan', icon: Map, roles: ['admin', 'manager'] },
+  { href: '/dashboard/admin/cashier/floor', title: 'Live Floor', icon: Sheet, roles: ['admin', 'manager', 'cashier', 'waiter']},
   {
     href: '/dashboard/admin/cash-register',
     title: 'Cash Register',
@@ -72,7 +78,7 @@ export default function AdminLayout({
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
-                    isActive={pathname === item.href}
+                    isActive={pathname === item.href || (item.href === '/dashboard/admin/reports' && (pathname.startsWith('/dashboard/admin/reports') || pathname.startsWith('/dashboard/admin/close-day')))}
                     tooltip={item.title}
                   >
                     <Link href={item.href}>

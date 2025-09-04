@@ -1,27 +1,15 @@
-import type { Metadata } from 'next';
 import './globals.css';
+import type { Metadata } from 'next';
 import { Toaster } from '@/components/ui/toaster';
-import ClientBoot from '@/components/client-boot';
 
-export const metadata: Metadata = {
-  title: 'Salisburys POS',
-  description: 'Lightspeed-style POS for ZA',
-};
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export const metadata: Metadata = { title: 'Salisburys POS', description: 'Back Office & POS' };
+
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      </head>
-      <body className="font-body antialiased">
-        <ClientBoot />
+    <html lang="en">
+      <body className="bg-neutral-50 text-slate-900 antialiased">
         {children}
         <Toaster />
       </body>
