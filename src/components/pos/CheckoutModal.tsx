@@ -68,7 +68,8 @@ export function CheckoutModal({ isOpen, onClose, cashierId, cashierName }: Check
     setProcessing(true);
     
     try {
-      const { orderId: newOrderId } = await call('cashierCreateOrder', { note: '' });
+      const res1: any = await call('cashierCreateOrder', { note: '' });
+      const { orderId: newOrderId } = res1;
       if (!newOrderId) throw new Error("Failed to create order.");
 
       await call('cashierSetItems', { 

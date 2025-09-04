@@ -185,7 +185,7 @@ export default function TimeClockPage() {
           
           <Card>
             <CardHeader>
-                <CardTitle>Today's Shifts</CardTitle>
+                <CardTitle>Today&apos;s Shifts</CardTitle>
             </CardHeader>
             <CardContent>
               {initialLoading ? (

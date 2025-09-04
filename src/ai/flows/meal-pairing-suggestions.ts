@@ -55,7 +55,7 @@ const mealPairingSuggestionsFlow = ai.defineFlow(
     inputSchema: MealPairingSuggestionsInputSchema,
     outputSchema: MealPairingSuggestionsOutputSchema,
   },
-  async input => {
+  async (input: MealPairingSuggestionsInput): Promise<MealPairingSuggestionsOutput> => {
     const {output} = await prompt(input);
     return output!;
   }

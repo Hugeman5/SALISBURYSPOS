@@ -14,7 +14,7 @@ export {
 } from "./products";
 
 // Users
-export {adminSetUserPin} from "./users";
+export {adminUpsertUser} from "./users";
 
 // Inventory
 export {
@@ -28,8 +28,6 @@ export {
   cashierSetItems,
   cashierTakePayment,
   cashierCloseOrder,
-  getSalesSummary,
-  adminExportOrders,
 } from "./orders";
 
 // Reports

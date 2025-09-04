@@ -72,7 +72,7 @@ export default function CashRegisterPage() {
             return;
         }
         try {
-            const result = await call('manageRegisterSession', { action: 'close', sessionId: openSession.id, countedCash: counted * 100 });
+            const result: any = await call('manageRegisterSession', { action: 'close', sessionId: openSession.id, countedCash: counted * 100 });
             toast({ 
                 title: "Register session closed",
                 description: `Variance (Over/Short): ${fmtZAR(result.overShort)}`

@@ -37,7 +37,7 @@ import { Loader2 } from 'lucide-react';
 import { upsertUser } from '@/lib/functions/users';
 import { useToast } from '@/hooks/use-toast';
 
-const roles: Role[] = ['admin', 'manager', 'cashier', 'waiter', 'kitchen'];
+const roles = ['admin', 'manager', 'cashier', 'waiter', 'kitchen'] as const;
 
 const userFormSchema = z.object({
   id: z.string().min(1, 'ID is required.'),
@@ -206,7 +206,6 @@ export function UserFormDrawer({ isOpen, onClose, onSaveSuccess, user, currentUs
                      <FormControl>
                         <Switch
                           id="user-active"
-                          autoComplete="off"
                           checked={field.value}
                           onCheckedChange={field.onChange}
                         />

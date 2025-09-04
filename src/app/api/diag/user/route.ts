@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     });
 
   } catch (e: any) {
-    console.error(`[diag/user] Error for uid=${uid}:`, e);
+    console.error(`[diag/user] Error`, e);
     return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
   }
 }
