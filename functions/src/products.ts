@@ -1,7 +1,8 @@
-
-import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
+'use server';
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import { db, FieldValue } from './utils.js';
+import { requireRole } from './roles.js';
 
 function parseCsvSimple(text: string): Record<string,string>[] {
   // Minimal CSV parser supporting quoted values and commas. Assumes \n line breaks.
@@ -28,11 +29,8 @@ function splitCsvLine(line:string): string[] {
   out.push(cur); return out;
 }
 
-type Req<T=any> = CallableRequest<T>;
-
-export const adminImportProductsCsv = onCall({ cors: true }, async (req: Req<{ csv: string }>) => {
-  const role = (req.auth as any)?.token?.role;
-  if (!role || !['admin','manager'].includes(role)) throw new HttpsError('permission-denied','Only manager/admin');
+export const adminImportProductsCsv = onCall({ cors: true, region: 'us-central1' }, async (req) => {
+  requireRole(req, ['admin', 'manager']);
   const csv = req.data?.csv; if (!csv) throw new HttpsError('invalid-argument','csv required');
 
   const rows = parseCsvSimple(csv);
@@ -49,7 +47,6 @@ export const adminImportProductsCsv = onCall({ cors: true }, async (req: Req<{ c
     const categoryId = r.categoryId || '';
     const active = (r.active ?? 'true').toString().toLowerCase() !== 'false';
 
-    // Upsert by SKU if present, else by name
     let ref = db.collection('items').doc();
     if (sku){
       const m = await db.collection('items').where('sku','==', sku).limit(1).get();
@@ -73,17 +70,18 @@ export const adminImportProductsCsv = onCall({ cors: true }, async (req: Req<{ c
     }, { merge: true });
     upserts++;
 
-    // Commit in chunks of 400 writes
-    if (upserts % 400 === 0){ await batch.commit(); logger.info('Committed 400 product writes'); }
+    if (upserts % 400 === 0){ 
+      await batch.commit(); 
+      logger.info('Committed 400 product writes');
+    }
   }
 
   if (upserts % 400 !== 0){ await batch.commit(); }
   return { ok:true, upserts };
 });
 
-export const adminExportProductsCsv = onCall({ cors: true }, async (req: Req) => {
-  const role = (req.auth as any)?.token?.role;
-  if (!role || !['admin','manager'].includes(role)) throw new HttpsError('permission-denied','Only manager/admin');
+export const adminExportProductsCsv = onCall({ cors: true, region: 'us-central1' }, async (req) => {
+  requireRole(req, ['admin', 'manager']);
   const snap = await db.collection('items').orderBy('name','asc').get();
   const rows = snap.docs.map(d=> ({ id:d.id, ...(d.data() as any) }));
   const header = ['id','name','sku','plu','barcode','categoryId','priceCents','costCents','vatRate','unit','active'];
@@ -99,3 +97,70 @@ function serializeCsvValue(v:any){
   if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"'+s.replace(/"/g,'""')+'"';
   return s;
 }
+
+export const adminUpsertProduct = onCall({ cors: true, region: 'us-central1' }, async(req) => {
+    requireRole(req, ['admin', 'manager']);
+    const { id, product } = req.data;
+    if (!product || !product.name) {
+        throw new HttpsError('invalid-argument', 'Product data is required.');
+    }
+    const ref = id ? db.collection('items').doc(id) : db.collection('items').doc();
+    const payload = {
+        ...product,
+        id: ref.id,
+        updatedAt: FieldValue.serverTimestamp(),
+        createdAt: product.createdAt || FieldValue.serverTimestamp(),
+    };
+    await ref.set(payload, { merge: true });
+    return { ok: true, id: ref.id };
+});
+
+export const adminDeleteProduct = onCall({ cors: true, region: 'us-central1' }, async(req) => {
+    requireRole(req, ['admin', 'manager']);
+    const { id } = req.data;
+    if (!id) {
+        throw new HttpsError('invalid-argument', 'Product ID is required.');
+    }
+    await db.collection('items').doc(id).delete();
+    return { ok: true };
+});
+
+export const adminPostStockMovement = onCall({ cors: true, region: 'us-central1' }, async(req) => {
+    requireRole(req, ['admin', 'manager']);
+    const { productId, delta, note } = req.data;
+    if (!productId || typeof delta !== 'number') {
+        throw new HttpsError('invalid-argument', 'ProductId and a numeric delta are required.');
+    }
+    
+    const productRef = db.collection('items').doc(productId);
+    const movementRef = db.collection('stock_movements').doc();
+    const now = FieldValue.serverTimestamp();
+    const uid = req.auth?.uid;
+
+    await db.runTransaction(async (transaction) => {
+        const productDoc = await transaction.get(productRef);
+        if (!productDoc.exists) {
+            throw new HttpsError('not-found', 'Product not found.');
+        }
+        const currentStock = productDoc.data()?.stockOnHand || 0;
+        const newStock = currentStock + delta;
+
+        transaction.update(productRef, { 
+            stockOnHand: newStock,
+            updatedAt: now,
+        });
+        
+        transaction.set(movementRef, {
+            productId,
+            delta,
+            note: note || null,
+            before: currentStock,
+            after: newStock,
+            createdAt: now,
+            updatedAt: now,
+            userId: uid,
+        });
+    });
+
+    return { ok: true, newStock };
+});

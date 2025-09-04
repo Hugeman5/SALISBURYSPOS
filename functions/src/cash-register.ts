@@ -1,121 +1,72 @@
-/**
- * @fileoverview Cloud Functions for cash register session management.
- */
 
-import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
-import { db, FieldValue, requireRole } from "./utils.js";
+'use server';
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { db, FieldValue } from './utils.js';
+import { requireRole } from './roles.js';
 
-type Req<T = any> = CallableRequest<T>;
+const getOpenSession = async (uid: string) => {
+    const q = db.collection('register_sessions').where('status', '==', 'open').where('openedBy.uid', '==', uid).limit(1);
+    const snap = await q.get();
+    return snap.docs[0];
+};
 
-/**
- * Manages cash register sessions (opening and closing).
- * This function is dispatched based on the 'action' property in the payload.
- */
-export const manageRegisterSession = onCall({ cors: true }, async (req: Req<{action: string, registerId: string, openingFloat: number, sessionId: string, countedCash: number}>) => {
-  requireRole(req, ["admin", "manager"]);
-  const uid = req.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
+export const manageRegisterSession = onCall({ cors: true, region: 'us-central1' }, async (req) => {
+    requireRole(req, ['admin', 'manager', 'cashier']);
+    const { action, floatCents } = req.data;
+    const uid = req.auth!.uid;
+    const name = req.auth!.token.name || 'Unknown';
 
-  const actorName = req.auth?.token?.name || req.auth?.token?.email || uid;
-  const {action, registerId, openingFloat, sessionId, countedCash} = req.data;
-
-  if (action === "open") {
-    if (!registerId || typeof openingFloat !== "number" ||
-        isNaN(openingFloat)) {
-      throw new HttpsError(
-        "invalid-argument", "Register ID and opening float are required."
-      );
+    if (action === 'open') {
+        const existing = await getOpenSession(uid);
+        if (existing) throw new HttpsError('already-exists', 'A session is already open.');
+        
+        const ref = db.collection('register_sessions').doc();
+        await ref.set({
+            status: 'open',
+            openingFloatCents: floatCents,
+            openedBy: { uid, name },
+            openedAt: FieldValue.serverTimestamp(),
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+        });
+        return { ok: true, sessionId: ref.id };
     }
-
-    const openSnap = await db.collection("register_sessions")
-      .where("registerId", "==", registerId)
-      .where("status", "==", "open").limit(1).get();
-    if (!openSnap.empty) {
-      throw new HttpsError(
-        "failed-precondition", "This register already has an open session."
-      );
+    
+    if (action === 'close') {
+        const sessionDoc = await getOpenSession(uid);
+        if (!sessionDoc) throw new HttpsError('not-found', 'No open session found.');
+        
+        await sessionDoc.ref.update({
+            status: 'closed',
+            closedAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+            closedBy: { uid, name },
+        });
+        return { ok: true };
     }
-
-    const newSessionRef = db.collection("register_sessions").doc();
-    await newSessionRef.set({
-      registerId, status: "open",
-      openedAt: FieldValue.serverTimestamp(),
-      openedBy: {uid, name: actorName},
-      openingFloat, expectedCash: openingFloat,
-    });
-    return {ok: true, sessionId: newSessionRef.id};
-  }
-
-  if (action === "close") {
-    if (!sessionId || typeof countedCash !== "number" || isNaN(countedCash)) {
-      throw new HttpsError(
-        "invalid-argument", "Session ID and counted cash are required."
-      );
+    
+    if (action === 'status') {
+        const sessionDoc = await getOpenSession(uid);
+        return { ok: true, session: sessionDoc ? {id: sessionDoc.id, ...sessionDoc.data()} : null };
     }
-    const sessionRef = db.collection("register_sessions").doc(sessionId);
-    const sessionSnap = await sessionRef.get();
-    if (!sessionSnap.exists) {
-      throw new HttpsError("not-found", "Session not found.");
-    }
-    const session = sessionSnap.data() || {};
-    if (session.status !== "open") {
-      throw new HttpsError("failed-precondition", "Session is not open.");
-    }
-
-    const expectedCash = Number(session.expectedCash) || 0;
-    const overShort = countedCash - expectedCash;
-    await sessionRef.update({
-      status: "closed",
-      closedAt: FieldValue.serverTimestamp(),
-      closedBy: {uid, name: actorName},
-      countedCash, overShort,
-    });
-    return {ok: true, overShort};
-  }
-
-  throw new HttpsError("invalid-argument", "Invalid action specified.");
+    
+    throw new HttpsError('invalid-argument', 'Invalid action.');
 });
 
-/**
- * Records a cash movement (pay-in or pay-out) for an open session.
- * This function transactionally updates the session's expected cash total.
- */
-export const postCashMovement = onCall({ cors: true }, async (req: Req<{sessionId: string, type: string, amount: number, reason: string}>) => {
-  requireRole(req, ["admin", "manager"]);
-  const uid = req.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Auth is required.");
-
-  const actorName = req.auth?.token?.name || req.auth?.token?.email || uid;
-  const {sessionId, type, amount, reason} = req.data;
-
-  if (!sessionId || !type || typeof amount !== "number" || !reason) {
-    throw new HttpsError("invalid-argument", "Missing required fields.");
-  }
-  if (type !== "payin" && type !== "payout") {
-    throw new HttpsError("invalid-argument", "Invalid movement type.");
-  }
-  if (!(amount > 0)) {
-    throw new HttpsError("invalid-argument", "Amount must be positive.");
-  }
-
-  const sessionRef = db.collection("register_sessions").doc(sessionId);
-  const movementRef = sessionRef.collection("cash_movements").doc();
-  const delta = type === "payin" ? amount : -amount;
-
-  await db.runTransaction(async (tx: any) => {
-    const s = await tx.get(sessionRef);
-    if (!s.exists) throw new HttpsError("not-found", "Session not found.");
-    const session = s.data() || {};
-    if (session.status !== "open") {
-      throw new HttpsError("failed-precondition", "Session is not open.");
-    }
-    const newExpected = (Number(session.expectedCash) || 0) + delta;
-    tx.update(sessionRef, {expectedCash: newExpected});
-    tx.set(movementRef, {
-      createdAt: FieldValue.serverTimestamp(),
-      by: {uid, name: actorName}, type, amount: delta, reason,
+export const postCashMovement = onCall({ cors: true, region: 'us-central1' }, async (req) => {
+    requireRole(req, ['admin', 'manager', 'cashier']);
+    const { type, amountCents, reason } = req.data;
+    if (type !== 'in' && type !== 'out') throw new HttpsError('invalid-argument', 'Type must be "in" or "out".');
+    if (typeof amountCents !== 'number' || amountCents <= 0) throw new HttpsError('invalid-argument', 'Amount must be a positive number.');
+    
+    await db.collection('cash_movements').add({
+        type,
+        amountCents,
+        reason: reason || null,
+        status: 'pending', // Requires manager approval
+        createdBy: req.auth!.uid,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
     });
-  });
-
-  return {ok: true};
+    return { ok: true };
 });
