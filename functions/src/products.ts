@@ -1,206 +1,101 @@
-/**
- * @fileoverview Cloud Functions for product and category management.
- */
 
-import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
-import {db, requireRole, FieldValue} from "./utils.js";
+import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
+import { logger } from 'firebase-functions';
+import { db, FieldValue } from './utils.js';
 
-type Req<T = any> = CallableRequest<T>;
-
-/**
- * Helper to normalize money strings (e.g., "123.45") into integer cents.
- * @param {string | number} s The string or number to convert.
- * @return {number} The value in cents.
- */
-function centsFromZarString(s: string | number): number {
-  const n = Number(String(s).replace(/[^\d.]/g, ""));
-  if (!Number.isFinite(n)) {
-    throw new HttpsError("invalid-argument", "Invalid price format");
+function parseCsvSimple(text: string): Record<string,string>[] {
+  // Minimal CSV parser supporting quoted values and commas. Assumes \n line breaks.
+  const lines = text.replace(/\r/g,'').split('\n').filter(l=>l.trim().length>0);
+  if (lines.length === 0) return [];
+  const headers = splitCsvLine(lines[0]);
+  return lines.slice(1).map(line => {
+    const cols = splitCsvLine(line);
+    const row: Record<string,string> = {};
+    headers.forEach((h,i)=> row[h.trim()] = (cols[i] ?? '').trim());
+    return row;
+  });
+}
+function splitCsvLine(line:string): string[] {
+  const out: string[] = []; let cur=''; let inQ=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(ch==='"'){
+      if(inQ && line[i+1]==='"'){ cur+='"'; i++; }
+      else inQ = !inQ;
+    } else if(ch===',' && !inQ){ out.push(cur); cur=''; }
+    else cur+=ch;
   }
-  return Math.round(n * 100);
+  out.push(cur); return out;
 }
 
-/**
- * Calculates the price excluding VAT from a VAT-inclusive price.
- * @param {number} incCents The price in cents, including VAT.
- * @param {number} taxRate The tax rate (e.g., 0.15 for 15%).
- * @return {number} The price in cents, excluding VAT.
- */
-function toExCents(incCents: number, taxRate: number): number {
-  return Math.round(incCents / (1 + taxRate));
-}
+type Req<T=any> = CallableRequest<T>;
 
-/**
- * Finds a category by name or creates it if it doesn't exist.
- * @param {string | null | undefined} name The category name.
- * @return {Promise<{id: string | null, name: string | null}>} The category.
- */
-async function getOrCreateCategoryByName(name?: string | null) {
-  if (!name) return {id: null as string | null, name: null as string | null};
-  const nameClean = name.trim();
-  if (!nameClean) return {id: null, name: null};
-  const nameLower = nameClean.toLowerCase();
+export const adminImportProductsCsv = onCall({ cors: true }, async (req: Req<{ csv: string }>) => {
+  const role = (req.auth as any)?.token?.role;
+  if (!role || !['admin','manager'].includes(role)) throw new HttpsError('permission-denied','Only manager/admin');
+  const csv = req.data?.csv; if (!csv) throw new HttpsError('invalid-argument','csv required');
 
-  const q = await db
-    .collection("categories")
-    .where("nameLower", "==", nameLower)
-    .limit(1)
-    .get();
+  const rows = parseCsvSimple(csv);
+  const batch = db.batch();
+  const now = FieldValue.serverTimestamp();
+  let upserts = 0;
 
-  if (!q.empty) {
-    const d = q.docs[0];
-    return {
-      id: d.id,
-      name: (d.get("name") as string) ?? nameClean,
-    };
+  for (const r of rows){
+    const name = r.name || r.Name || '';
+    if (!name) continue;
+    const sku = r.sku || r.SKU || '';
+    const priceCents = Number(r.priceCents ?? r.price_cents ?? r.price ?? 0) | 0;
+    const costCents = r.costCents ? Number(r.costCents) | 0 : undefined;
+    const categoryId = r.categoryId || '';
+    const active = (r.active ?? 'true').toString().toLowerCase() !== 'false';
+
+    // Upsert by SKU if present, else by name
+    let ref = db.collection('items').doc();
+    if (sku){
+      const m = await db.collection('items').where('sku','==', sku).limit(1).get();
+      ref = m.docs[0]?.ref ?? ref;
+    } else {
+      const m = await db.collection('items').where('name','==', name).limit(1).get();
+      ref = m.docs[0]?.ref ?? ref;
+    }
+
+    batch.set(ref, {
+      name, sku,
+      plu: r.plu || r.PLU || '',
+      barcode: r.barcode || '',
+      categoryId: categoryId || null,
+      priceCents, costCents,
+      vatRate: r.vatRate ? Number(r.vatRate) : 15,
+      unit: r.unit || 'ea',
+      active,
+      updatedAt: now,
+      createdAt: now
+    }, { merge: true });
+    upserts++;
+
+    // Commit in chunks of 400 writes
+    if (upserts % 400 === 0){ await batch.commit(); logger.info('Committed 400 product writes'); }
   }
 
-  const ref = db.collection("categories").doc();
-  await ref.set({name: nameClean, nameLower, sort: 0});
-  return {id: ref.id, name: nameClean};
-}
-
-
-/** Interface for the upsert product core function payload. */
-interface UpsertInput {
-  id?: string;
-  name: string;
-  sku: string;
-  barcode?: string | null;
-  categoryName?: string | null;
-  trackStock?: boolean;
-  priceInc: number | string;
-  costInc?: string | number | null;
-  taxRate?: number;
-}
-
-/**
- * Core logic to create or update a product, shared by single and bulk actions.
- * @param {UpsertInput} input The product data.
- * @return {Promise<{ok: true, id: string}>} The result of the operation.
- */
-async function upsertProductCore(input: UpsertInput) {
-  const {
-    id, name, sku, barcode = null, categoryName = null, trackStock = true,
-    priceInc, costInc = "", taxRate = 0.15,
-  } = input;
-
-  if (typeof name !== "string" || !name.trim()) {
-    throw new HttpsError("invalid-argument", "Product name is required.");
-  }
-  if (typeof sku !== "string" || !sku.trim()) {
-    throw new HttpsError("invalid-argument", "Product SKU is required.");
-  }
-
-  const skuUpper = sku.trim().toUpperCase();
-  const incCents = centsFromZarString(priceInc);
-  const exCents = toExCents(incCents, taxRate);
-  const costIncCents = (costInc === null || costInc === "") ?
-    null : centsFromZarString(costInc);
-
-  const {id: categoryId, name: catName} =
-    await getOrCreateCategoryByName(categoryName);
-
-  const conflicts = await db.collection("products")
-    .where("skuUpper", "==", skuUpper).get();
-  if (!conflicts.empty && conflicts.docs.some((d: any) => d.id !== id)) {
-    throw new HttpsError("already-exists", `SKU already exists: ${skuUpper}`);
-  }
-
-  const data = {
-    name: name.trim(), nameLower: name.trim().toLowerCase(),
-    sku: sku.trim(), skuUpper, barcode: barcode ? String(barcode) : null,
-    categoryId, categoryName: catName, trackStock: !!trackStock,
-    price: {currency: "ZAR", taxRate, incCents, exCents}, costIncCents,
-    updatedAt: FieldValue.serverTimestamp(),
-  };
-
-  const productId = id || db.collection("products").doc().id;
-  const productRef = db.collection("products").doc(productId);
-  const doc = await productRef.get();
-  if (!doc.exists) {
-    await productRef.set({
-      ...data, createdAt: FieldValue.serverTimestamp(),
-    });
-  } else {
-    await productRef.update(data);
-  }
-  return {ok: true, id: productId};
-}
-
-/** Callable to upsert a single product. */
-export const adminUpsertProduct = onCall({ cors: true }, async (req: Req<UpsertInput>) => {
-  requireRole(req, ["admin", "manager"]);
-  return upsertProductCore(req.data);
+  if (upserts % 400 !== 0){ await batch.commit(); }
+  return { ok:true, upserts };
 });
 
-/** Callable to delete a single product. */
-export const adminDeleteProduct = onCall({ cors: true }, async (req: Req<{id: string}>) => {
-  requireRole(req, ["admin"]);
-  const {id} = req.data;
-  if (!id) throw new HttpsError("invalid-argument", "Product ID is required.");
-  await db.collection("products").doc(id).delete();
-  return {ok: true};
+export const adminExportProductsCsv = onCall({ cors: true }, async (req: Req) => {
+  const role = (req.auth as any)?.token?.role;
+  if (!role || !['admin','manager'].includes(role)) throw new HttpsError('permission-denied','Only manager/admin');
+  const snap = await db.collection('items').orderBy('name','asc').get();
+  const rows = snap.docs.map(d=> ({ id:d.id, ...(d.data() as any) }));
+  const header = ['id','name','sku','plu','barcode','categoryId','priceCents','costCents','vatRate','unit','active'];
+  const csv = [header.join(',')]
+    .concat(rows.map(r => header.map(h => serializeCsvValue(r[h])).join(',')))
+    .join('\n');
+  return { filename: `products-${Date.now()}.csv`, csv };
 });
 
-/** Callable to export all products to a CSV string. */
-export const adminExportProducts = onCall({ cors: true }, async (req: Req) => {
-  requireRole(req, ["admin", "manager"]);
-  const snap = await db.collection("products").orderBy("nameLower").get();
-  const rows: string[] = [
-    "id,name,sku,barcode,category,trackStock,priceIncZAR,costIncZAR,taxRate",
-  ];
-  for (const doc of snap.docs) {
-    const p = doc.data();
-    const priceInc = (p.price?.incCents ?? 0) / 100;
-    const cost = p.costIncCents === null || p.costIncCents === undefined ?
-      "" : (Number(p.costIncCents) / 100).toFixed(2);
-    const esc = (s: string|null|undefined) =>
-      `"${String(s??"").replace(/"/g, "\"\"")}"`;
-    rows.push([
-      doc.id, esc(p.name), p.sku??"", p.barcode??"", esc(p.categoryName),
-      String(!!p.trackStock), priceInc.toFixed(2), cost,
-      String(p.price?.taxRate ?? 0.15),
-    ].join(","));
-  }
-  return {ok: true, csv: rows.join("\n")};
-});
-
-/** Callable to bulk import products from a CSV string. */
-export const adminBulkImportProducts = onCall({ cors: true }, async (req: Req<{csv: string}>) => {
-  requireRole(req, ["admin", "manager"]);
-  const csv: string = req.data?.csv || "";
-  if (!csv) throw new HttpsError("invalid-argument", "CSV data is required.");
-
-  const lines = csv.trim().split(/\r?\n/);
-  if (lines.length < 2) return {ok: true, imported: 0};
-
-  const [header, ...rowLines] = lines;
-  const head = header.split(",").map((s) => s.trim().toLowerCase());
-  const idx = (k: string) => head.indexOf(k);
-
-  const iName = idx("name");
-  const iSku = idx("sku");
-  const iInc = idx("priceinczar");
-  if (iName<0 || iSku<0 || iInc<0) {
-    throw new HttpsError("invalid-argument", "CSV needs name,sku,priceIncZAR");
-  }
-
-  let imported = 0;
-  for (const row of rowLines) {
-    if (!row.trim()) continue;
-    const p = row.split(",").map((s) => s.trim());
-    const input: UpsertInput = {
-      name: p[iName], sku: p[iSku], priceInc: p[iInc],
-      barcode: p[idx("barcode")] || null,
-      categoryName: p[idx("category")] || null,
-      trackStock: /^true$/i.test(p[idx("trackstock")] || "true"),
-      costInc: p[idx("costinczar")] || "",
-      taxRate: Number(p[idx("taxrate")] || 0.15),
-    };
-    if (!input.name || !input.sku || !input.priceInc) continue;
-    await upsertProductCore(input);
-    imported++;
-  }
-  return {ok: true, imported};
-});
+function serializeCsvValue(v:any){
+  if (v==null) return '';
+  const s=String(v);
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"'+s.replace(/"/g,'""')+'"';
+  return s;
+}
