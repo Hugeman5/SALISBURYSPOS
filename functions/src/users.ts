@@ -3,7 +3,8 @@
  */
 
 import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
-import {auth, db, requireRole, FieldValue} from "./utils.js";
+import {auth, db, FieldValue} from "./utils.js";
+import { requireRole } from './roles.js';
 import * as bcrypt from "bcryptjs";
 import {z} from "zod";
 
@@ -79,7 +80,7 @@ export const adminUpsertUser = onCall({ cors: true }, async (req: Req<z.infer<ty
 export const adminDeleteUser = onCall({ cors: true }, async (req: Req<{id: string}>) => {
   requireRole(req, ["admin", "manager"]);
   const {id} = z.object({id: z.string().min(1)}).parse(req.data);
-  await db.collection("users").doc(id).update({active: false});
+  await db.collection("users").doc(id).update({ active: false });
   return {ok: true, id};
 });
 

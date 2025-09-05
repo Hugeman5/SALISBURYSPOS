@@ -1,11 +1,9 @@
-
-'use server';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { db, FieldValue } from './utils.js';
-import { requireRole } from './roles.js';
+import { requireRole, ADMIN_ROLES, STAFF_ROLES } from './roles.js';
 
 export const adminUpsertFloorPlan = onCall({ cors: true, region: 'us-central1' }, async (req) => {
-    requireRole(req, ['admin', 'manager']);
+    requireRole(req, ADMIN_ROLES);
     const { plan } = req.data;
     if (!plan || !plan.id) throw new HttpsError('invalid-argument', 'Plan with ID is required.');
     const ref = db.collection('floor_plans').doc(plan.id);
@@ -14,7 +12,7 @@ export const adminUpsertFloorPlan = onCall({ cors: true, region: 'us-central1' }
 });
 
 export const adminDisableTables = onCall({ cors: true, region: 'us-central1' }, async (req) => {
-    requireRole(req, ['admin', 'manager']);
+    requireRole(req, ADMIN_ROLES);
     const { tableIds, disabled } = req.data;
     if (!Array.isArray(tableIds) || typeof disabled !== 'boolean') {
         throw new HttpsError('invalid-argument', 'tableIds array and disabled boolean are required.');

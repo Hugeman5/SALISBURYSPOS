@@ -1,11 +1,9 @@
-
-'use server';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { storage } from './utils.js';
-import { requireRole } from './roles.js';
+import { requireRole, ADMIN_ROLES } from './roles.js';
 
 export const getSignedUploadUrl = onCall({ cors: true, region: 'us-central1' }, async (req) => {
-    requireRole(req, ['admin', 'manager']);
+    requireRole(req, ADMIN_ROLES);
     const { path } = req.data;
     if (!path || typeof path !== 'string') {
         throw new HttpsError('invalid-argument', 'A storage path is required.');

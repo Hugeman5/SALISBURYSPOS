@@ -1,8 +1,6 @@
-
-'use server';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { db, FieldValue } from './utils.js';
-import { requireRole } from './roles.js';
+import { requireRole, ADMIN_ROLES } from './roles.js';
 
 // This is a placeholder for a more robust CSV parser
 const parseCsvSimple = (csv: string) => {
@@ -18,7 +16,7 @@ const parseCsvSimple = (csv: string) => {
 };
 
 export const adminUpsertMenu = onCall({ cors: true, region: 'us-central1' }, async (req) => {
-    requireRole(req, ['admin', 'manager']);
+    requireRole(req, ADMIN_ROLES);
     const { menu } = req.data;
     if (!menu || !menu.id) throw new HttpsError('invalid-argument', 'Menu with ID is required.');
     const ref = db.collection('menus').doc(menu.id);
@@ -27,7 +25,7 @@ export const adminUpsertMenu = onCall({ cors: true, region: 'us-central1' }, asy
 });
 
 export const adminUpsertMenuEntities = onCall({ cors: true, region: 'us-central1' }, async (req) => {
-    requireRole(req, ['admin', 'manager']);
+    requireRole(req, ADMIN_ROLES);
     const { screens, buttons } = req.data;
     const batch = db.batch();
     const now = FieldValue.serverTimestamp();
@@ -49,7 +47,7 @@ export const adminUpsertMenuEntities = onCall({ cors: true, region: 'us-central1
 });
 
 export const adminSetMenuAvailability = onCall({ cors: true, region: 'us-central1' }, async (req) => {
-    requireRole(req, ['admin', 'manager']);
+    requireRole(req, ADMIN_ROLES);
     const { menuId, rules } = req.data;
     if (!menuId || !Array.isArray(rules)) throw new HttpsError('invalid-argument', 'Menu ID and rules array are required.');
     
@@ -68,7 +66,7 @@ export const adminSetMenuAvailability = onCall({ cors: true, region: 'us-central
 });
 
 export const adminImportMenuCsv = onCall({ cors: true, region: 'us-central1' }, async (req) => {
-    requireRole(req, ['admin', 'manager']);
+    requireRole(req, ADMIN_ROLES);
     const { csv } = req.data;
     if (!csv) throw new HttpsError('invalid-argument', 'CSV data is required.');
     // CSV logic would be complex here, involving mapping to screens, buttons, items etc.
@@ -78,13 +76,13 @@ export const adminImportMenuCsv = onCall({ cors: true, region: 'us-central1' }, 
 });
 
 export const adminExportMenuCsv = onCall({ cors: true, region: 'us-central1' }, async (req) => {
-    requireRole(req, ['admin', 'manager']);
+    requireRole(req, ADMIN_ROLES);
     // Logic to fetch all menu related data and format as CSV
     return { ok: true, filename: `menu-${Date.now()}.csv`, csv: "type,id,name\nitem,1,Coffee" };
 });
 
 export const adminUpsertPriceRules = onCall({ cors: true, region: 'us-central1' }, async (req) => {
-    requireRole(req, ['admin', 'manager']);
+    requireRole(req, ADMIN_ROLES);
     const { rules } = req.data;
     if (!Array.isArray(rules)) throw new HttpsError('invalid-argument', 'Rules must be an array.');
     

@@ -1,8 +1,6 @@
-
-'use server';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { db, FieldValue, Timestamp } from './utils.js';
-import { requireRole } from './roles.js';
+import { requireRole, ADMIN_ROLES } from './roles.js';
 
 // Helper to get SA start/end of day
 function getSaDayWindow(dateStr?: string) {
@@ -14,7 +12,7 @@ function getSaDayWindow(dateStr?: string) {
 }
 
 export const adminCloseDay = onCall({ cors: true, region: 'us-central1' }, async (req) => {
-    requireRole(req, ['admin', 'manager']);
+    requireRole(req, ADMIN_ROLES);
     const { date } = req.data; // date as 'YYYY-MM-DD'
     const { start, end } = getSaDayWindow(date);
 
@@ -58,35 +56,35 @@ const exportCsv = (filename: string, data: any[]) => {
 }
 
 export const adminExportZCsv = onCall({ cors: true, region: 'us-central1' }, async (req) => {
-    requireRole(req, ['admin', 'manager']);
+    requireRole(req, ADMIN_ROLES);
     const snap = await db.collection('z_closures').orderBy('createdAt', 'desc').get();
     const data = snap.docs.map(d => ({id: d.id, ...d.data()}));
     return exportCsv(`z-closures-${Date.now()}.csv`, data);
 });
 
 export const adminExportTimeCsv = onCall({ cors: true, region: 'us-central1' }, async (req) => {
-    requireRole(req, ['admin', 'manager']);
+    requireRole(req, ADMIN_ROLES);
     const snap = await db.collection('time_clock').orderBy('inAt', 'desc').get();
     const data = snap.docs.map(d => d.data());
     return exportCsv(`timeclock-${Date.now()}.csv`, data);
 });
 
 export const adminExportOrders = onCall({ cors: true, region: 'us-central1' }, async (req) => {
-    requireRole(req, ['admin', 'manager']);
+    requireRole(req, ADMIN_ROLES);
     const snap = await db.collection('orders').orderBy('createdAt', 'desc').limit(1000).get();
     const data = snap.docs.map(d => ({id: d.id, ...d.data()}));
     return exportCsv(`orders-${Date.now()}.csv`, data);
 });
 
 export const adminExportLedger = onCall({ cors: true, region: 'us-central1' }, async (req) => {
-    requireRole(req, ['admin', 'manager']);
+    requireRole(req, ADMIN_ROLES);
     const snap = await db.collection('stock_movements').orderBy('createdAt', 'desc').limit(1000).get();
     const data = snap.docs.map(d => d.data());
     return exportCsv(`ledger-${Date.now()}.csv`, data);
 });
 
 export const getSalesSummary = onCall({ cors: true, region: 'us-central1' }, async (req) => {
-    requireRole(req, ['admin', 'manager']);
+    requireRole(req, ADMIN_ROLES);
     const { from, to } = req.data;
     let q = db.collection('orders').where('status', '==', 'paid');
     if (from) q = q.where('createdAt', '>=', Timestamp.fromDate(new Date(from)));
