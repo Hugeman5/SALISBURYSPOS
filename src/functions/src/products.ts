@@ -1,3 +1,3 @@
-export * from '../../../functions/src/products';
+export * from '../../../functions/src/endpoints';
 
 

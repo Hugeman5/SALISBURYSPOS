@@ -1,3 +1,3 @@
-export * from '../../../functions/src/inventory';
+export * from '../../../functions/src/endpoints';
 
 
