@@ -4,6 +4,7 @@
 export type LocationId = string;
 export type DeviceId = string;
 export type MenuId = string;
+export type Id = string;
 
 // Menu Configuration
 export interface Menu {
@@ -14,8 +15,8 @@ export interface Menu {
   active: boolean;
   deviceIds?: DeviceId[];
   default?: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: any;
+  updatedAt: any;
 }
 
 export interface MenuScreen {
@@ -25,6 +26,8 @@ export interface MenuScreen {
   color?: string;
   order: number;
   parentScreenId?: string | null;
+  createdAt: any; 
+  updatedAt: any;
 }
 
 export type ButtonType = 'item'|'combo'|'discount'|'instruction'|'order_profile'|'submenu'|'category';
@@ -38,6 +41,20 @@ export interface MenuButton {
   label?: string;
   color?: string;
   order: number;
+  width?: number; 
+  height?: number;
+  createdAt: any; 
+  updatedAt: any;
+}
+
+export interface Category {
+  id: Id;
+  name: string;
+  parentId?: Id | null;
+  order: number;
+  active: boolean;
+  createdAt: any; 
+  updatedAt: any;
 }
 
 // Menu Entities
@@ -54,8 +71,12 @@ export interface Item {
   printerRouteIds?: string[];
   tags?: string[];
   modifierGroupIds?: string[];
-  createdAt: string;
-  updatedAt: string;
+  trackStock?: boolean;
+  stockOnHand?: number | null;
+  costCents?: number;
+  unit?: string;
+  createdAt: any;
+  updatedAt: any;
 }
 
 export interface ModifierGroup {
@@ -70,6 +91,8 @@ export interface ModifierGroup {
     active: boolean;
   }[];
   active: boolean;
+  createdAt: any; 
+  updatedAt: any;
 }
 
 export interface Combo {
@@ -84,39 +107,31 @@ export interface Combo {
     options: { itemId: string }[];
   }[];
   active: boolean;
+  createdAt: any; 
+  updatedAt: any;
 }
 
 // Pricing and Availability
 export interface PriceRule {
-  id: string;
+  id: Id;
   name: string;
-  type: 'percent_discount' | 'percent_surcharge' | 'absolute_adjust';
-  value: number;
-  appliesTo: {
-    itemIds?: string[];
-    categoryIds?: string[];
-  };
-  schedule?: {
-    days?: number[]; // 0=Sun, 1=Mon, ...
-    from?: string; // "HH:mm"
-    to?: string; // "HH:mm"
-  };
-  locationIds?: LocationId[];
-  orderProfileIds?: string[];
-  active: boolean;
+  appliesTo: { itemIds?: Id[]; categoryIds?: Id[] };
+  type: 'percentOff' | 'fixedPrice' | 'amountOff';
+  value: number; // e.g., 20 (percent) or 1000 (cents)
+  start?: string; end?: string; // ISO local time windows
+  days?: number[];             // 0-6
+  createdAt: any; updatedAt: any;
 }
 
 export interface MenuAvailability {
-  id: string;
-  menuId: MenuId;
-  schedule: {
-    days?: number[];
-    from?: string;
-    to?: string;
-    dates?: string[]; // "YYYY-MM-DD"
-  };
-  devices?: DeviceId[];
-  locations?: LocationId[];
+  id: Id;
+  menuId: Id;
+  days?: number[];             // 0-6
+  start?: string; end?: string;// 'HH:mm'
+  deviceIds?: string[];
+  locationIds?: string[];
+  createdAt: any; updatedAt: any;
+  active: boolean;
 }
 
 // Floor Plans & Table State

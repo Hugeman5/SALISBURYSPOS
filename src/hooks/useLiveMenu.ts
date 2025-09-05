@@ -1,10 +1,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
-import { app } from '@/app/lib/firebaseClient';
+import { app } from '@/lib/firebase';
 import {
   getFirestore, collection, onSnapshot, query, where, orderBy, DocumentData
 } from 'firebase/firestore';
 import type { Menu, MenuButton, MenuScreen, Item } from '@/types/menu-floor';
+import { effectivePrice, isMenuAvailable } from '@/lib/menu';
 
 export type LiveMenuContext = {
   deviceId: string;
@@ -41,12 +42,12 @@ export function useLiveMenu(ctx: LiveMenuContext): LiveMenuData {
     const unsubs: (() => void)[] = [];
     try {
       unsubs.push(onSnapshot(query(collection(db, 'menus'), where('active', '==', true), orderBy('order', 'asc')), s => {
-        setMenus(s.docs.map(d => d.data() as Menu));
+        setMenus(s.docs.map(d => ({ id:d.id, ...(d.data() as any) })));
       }));
-      unsubs.push(onSnapshot(collection(db, 'menu_availability'), s => setAvailability(s.docs.map(d => d.data()))));
-      unsubs.push(onSnapshot(collection(db, 'price_rules'), s => setRules(s.docs.map(d => d.data()))));
+      unsubs.push(onSnapshot(collection(db, 'menu_availability'), s => setAvailability(s.docs.map(d => ({ id:d.id, ...(d.data() as any) })))));
+      unsubs.push(onSnapshot(collection(db, 'price_rules'), s => setRules(s.docs.map(d => ({ id:d.id, ...(d.data() as any) })))));
       unsubs.push(onSnapshot(query(collection(db, 'categories'), where('active', '==', true), orderBy('order', 'asc')), s => setCategories(s.docs.map(d => ({ id: d.id, ...(d.data() as DocumentData) })))));
-      unsubs.push(onSnapshot(query(collection(db, 'items'), where('active', '==', true)), s => setItems(s.docs.map(d => d.data() as Item))))
+      unsubs.push(onSnapshot(query(collection(db, 'items'), where('active', '==', true)), s => setItems(s.docs.map(d => ({ id:d.id, ...(d.data() as any) })))))    
     } catch (e: any) {
       setError(e?.message || String(e));
     }
@@ -78,10 +79,10 @@ export function useLiveMenu(ctx: LiveMenuContext): LiveMenuData {
     if (!menu) { setLoading(false); return () => {}; }
 
     unsubs.push(onSnapshot(query(collection(db, 'menu_screens'), where('menuId', '==', menu.id), orderBy('order', 'asc')), s => {
-      setScreens(s.docs.map(d => d.data() as MenuScreen));
+      setScreens(s.docs.map(d => ({ id:d.id, ...(d.data() as any) })));
     }));
     unsubs.push(onSnapshot(query(collection(db, 'menu_buttons'), where('menuId', '==', menu.id), orderBy('order', 'asc')), s => {
-      setButtons(s.docs.map(d => d.data() as MenuButton));
+      setButtons(s.docs.map(d => ({ id:d.id, ...(d.data() as any) })));
       setLoading(false);
     }));
     return () => { unsubs.forEach(u => u()); };
