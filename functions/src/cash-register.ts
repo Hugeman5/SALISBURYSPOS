@@ -1,8 +1,5 @@
-
-'use server';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { db, FieldValue } from './utils.js';
-import { requireRole } from './roles.js';
+import { db, FieldValue, requireRole } from './utils.js';
 
 const getOpenSession = async (uid: string) => {
     const q = db.collection('register_sessions').where('status', '==', 'open').where('openedBy.uid', '==', uid).limit(1);
